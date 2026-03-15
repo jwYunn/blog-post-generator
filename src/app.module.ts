@@ -10,6 +10,8 @@ import { TopicSeedModule } from './topic-seed/topic-seed.module';
 import { TopicGenerateModule } from './topic-generate/topic-generate.module';
 import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
 import { ArticleDraftModule } from './article-draft/article-draft.module';
+import { ArticleOutlineModule } from './article-outline/article-outline.module';
+import { ArticleContentModule } from './article-content/article-content.module';
 
 @Module({
   imports: [
@@ -44,6 +46,8 @@ import { ArticleDraftModule } from './article-draft/article-draft.module';
     TopicGenerateModule,
     TopicCandidateModule,
     ArticleDraftModule,
+    ArticleOutlineModule,
+    ArticleContentModule,
   ],
   controllers: [AppController],
   providers: [AppService],
