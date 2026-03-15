@@ -24,6 +24,7 @@
     "migration:create": "npm run typeorm -- migration:create src/database/migrations/$npm_config_name"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "@bull-board/api": "^6.20.5",
     "@bull-board/express": "^6.20.5",
     "@bull-board/nestjs": "^6.20.5",
@@ -39,8 +40,10 @@
     "class-validator": "^0.14.4",
     "dotenv": "^17.3.1",
     "ioredis": "^5.10.0",
+    "openai": "^6.29.0",
     "pg": "^8.20.0",
     "reflect-metadata": "^0.1.13",
+    "replicate": "^1.4.0",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.28"
   },
