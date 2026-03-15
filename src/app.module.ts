@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { TopicSeedModule } from './topic-seed/topic-seed.module';
 import { TopicGenerateModule } from './topic-generate/topic-generate.module';
 import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
+import { ArticleDraftModule } from './article-draft/article-draft.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
     TopicSeedModule,
     TopicGenerateModule,
     TopicCandidateModule,
+    ArticleDraftModule,
   ],
   controllers: [AppController],
   providers: [AppService],
