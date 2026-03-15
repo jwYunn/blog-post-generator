@@ -12,6 +12,7 @@ import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
 import { ArticleDraftModule } from './article-draft/article-draft.module';
 import { ArticleOutlineModule } from './article-outline/article-outline.module';
 import { ArticleContentModule } from './article-content/article-content.module';
+import { ArticleThumbnailModule } from './article-thumbnail/article-thumbnail.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { ArticleContentModule } from './article-content/article-content.module';
     ArticleDraftModule,
     ArticleOutlineModule,
     ArticleContentModule,
+    ArticleThumbnailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

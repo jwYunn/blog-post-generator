@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Job, Queue } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
@@ -7,6 +8,10 @@ import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.
 import { ArticleOutline } from '../article-outline/article-outline.types';
 import { ArticleContentAiService } from './article-content-ai.service';
 import { ARTICLE_CONTENT_QUEUE } from './article-content.constants';
+import {
+  ARTICLE_THUMBNAIL_QUEUE,
+  GENERATE_ARTICLE_THUMBNAIL_JOB,
+} from '../article-thumbnail/article-thumbnail.constants';
 
 interface ArticleContentJobPayload {
   articleDraftId: string;
@@ -18,6 +23,8 @@ export class ArticleContentProcessor extends WorkerHost {
     @InjectRepository(ArticleDraftEntity)
     private readonly draftRepository: Repository<ArticleDraftEntity>,
     private readonly articleContentAiService: ArticleContentAiService,
+    @InjectQueue(ARTICLE_THUMBNAIL_QUEUE)
+    private readonly articleThumbnailQueue: Queue,
   ) {
     super();
   }
@@ -50,7 +57,9 @@ export class ArticleContentProcessor extends WorkerHost {
       draft.errorMessage = null;
       await this.draftRepository.save(draft);
 
-      // TODO: enqueue thumbnail generation job
+      await this.articleThumbnailQueue.add(GENERATE_ARTICLE_THUMBNAIL_JOB, {
+        articleDraftId: draft.id,
+      });
     } catch (error) {
       draft.status = ArticleDraftStatus.FAILED;
       draft.errorMessage =
