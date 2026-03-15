@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TopicCandidateEntity } from './topic-candidate.entity';
@@ -8,6 +8,7 @@ import {
   CandidateSortBy,
   CandidateSortOrder,
 } from './dto/query-topic-candidate-list.dto';
+import { UpdateTopicCandidateStatusDto } from './dto/update-topic-candidate-status.dto';
 
 export interface CandidatePayload {
   keyword: string;
@@ -93,5 +94,18 @@ export class TopicCandidateService {
     const [data, total] = await qb.getManyAndCount();
 
     return { data, total, page, limit };
+  }
+
+  async updateStatus(
+    id: string,
+    dto: UpdateTopicCandidateStatusDto,
+  ): Promise<TopicCandidateEntity> {
+    const candidate = await this.candidateRepository.findOne({ where: { id } });
+    if (!candidate) {
+      throw new NotFoundException(`TopicCandidate #${id} not found`);
+    }
+
+    candidate.status = dto.status as unknown as TopicCandidateStatus;
+    return this.candidateRepository.save(candidate);
   }
 }
