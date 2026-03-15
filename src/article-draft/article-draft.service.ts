@@ -10,6 +10,11 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ArticleDraftEntity } from './article-draft.entity';
 import { ArticleDraftStatus } from './enums/article-draft-status.enum';
+import {
+  DraftSortBy,
+  DraftSortOrder,
+  QueryArticleDraftListDto,
+} from './dto/query-article-draft-list.dto';
 import { TopicCandidateEntity } from '../topic-candidate/topic-candidate.entity';
 import { TopicCandidateStatus } from '../topic-candidate/enums/topic-candidate-status.enum';
 import {
@@ -65,6 +70,34 @@ export class ArticleDraftService {
     });
 
     return saved;
+  }
+
+  async findAll(dto: QueryArticleDraftListDto): Promise<{
+    data: ArticleDraftEntity[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      sortBy = DraftSortBy.CREATED_AT,
+      sortOrder = DraftSortOrder.DESC,
+    } = dto;
+
+    const qb = this.draftRepository.createQueryBuilder('ad');
+
+    if (status) {
+      qb.andWhere('ad.status = :status', { status });
+    }
+
+    qb.orderBy(`ad.${sortBy}`, sortOrder);
+    qb.skip((page - 1) * limit).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+
+    return { data, total, page, limit };
   }
 
   async findOne(id: string): Promise<ArticleDraftEntity> {
