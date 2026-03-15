@@ -8,6 +8,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TopicModule } from './topic/topic.module';
 import { TopicSeedModule } from './topic-seed/topic-seed.module';
+import { TopicGenerateModule } from './topic-generate/topic-generate.module';
+import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
 
 @Module({
   imports: [
@@ -40,6 +42,8 @@ import { TopicSeedModule } from './topic-seed/topic-seed.module';
     }),
     TopicModule,
     TopicSeedModule,
+    TopicGenerateModule,
+    TopicCandidateModule,
   ],
   controllers: [AppController],
   providers: [AppService],

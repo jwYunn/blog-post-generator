@@ -48,4 +48,9 @@ export class TopicSeedController {
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.topicSeedService.remove(id);
   }
+
+  @Post(':id/generate')
+  generate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.topicSeedService.generate(id);
+  }
 }

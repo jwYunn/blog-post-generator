@@ -1,20 +1,29 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Repository } from 'typeorm';
+import { Queue } from 'bullmq';
 import { TopicSeedEntity } from './topic-seed.entity';
 import { CreateTopicSeedDto } from './dto/create-topic-seed.dto';
 import { UpdateTopicSeedDto } from './dto/update-topic-seed.dto';
 import { ListTopicSeedQueryDto, SortByField, SortOrder } from './dto/list-topic-seed-query.dto';
+import {
+  TOPIC_GENERATE_QUEUE,
+  GENERATE_TOPIC_CANDIDATES_JOB,
+} from '../topic-generate/topic-generate.constants';
 
 @Injectable()
 export class TopicSeedService {
   constructor(
     @InjectRepository(TopicSeedEntity)
     private readonly topicSeedRepository: Repository<TopicSeedEntity>,
+    @InjectQueue(TOPIC_GENERATE_QUEUE)
+    private readonly topicGenerateQueue: Queue,
   ) {}
 
   private normalize(seed: string): string {
@@ -117,6 +126,23 @@ export class TopicSeedService {
   async remove(id: string): Promise<void> {
     await this.findOne(id);
     await this.topicSeedRepository.softDelete(id);
+  }
+
+  async generate(id: string): Promise<{ message: string; seedId: string }> {
+    const seed = await this.findOne(id);
+
+    if (!seed.isActive) {
+      throw new BadRequestException(
+        `Seed #${id} is inactive. Activate it before generating topics.`,
+      );
+    }
+
+    await this.topicGenerateQueue.add(GENERATE_TOPIC_CANDIDATES_JOB, { seedId: id });
+
+    return {
+      message: 'Topic generation job has been queued.',
+      seedId: id,
+    };
   }
 
   // BullMQ Job 전용: 활성화된 seed 목록 반환
