@@ -1,6 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
 import {
@@ -8,7 +14,16 @@ import {
   CandidateSortBy,
   CandidateSortOrder,
 } from './dto/query-topic-candidate-list.dto';
-import { UpdateTopicCandidateStatusDto } from './dto/update-topic-candidate-status.dto';
+import {
+  AllowedCandidateStatus,
+  UpdateTopicCandidateStatusDto,
+} from './dto/update-topic-candidate-status.dto';
+import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
+import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
+import {
+  ARTICLE_OUTLINE_QUEUE,
+  GENERATE_ARTICLE_OUTLINE_JOB,
+} from '../article-outline/article-outline.constants';
 
 export interface CandidatePayload {
   keyword: string;
@@ -16,11 +31,27 @@ export interface CandidatePayload {
   score: number;
 }
 
+type ApproveResult = {
+  id: string;
+  status: 'approved';
+  articleDraftId: string;
+  articleDraftCreated: boolean;
+};
+
+type RejectResult = {
+  id: string;
+  status: 'rejected';
+};
+
 @Injectable()
 export class TopicCandidateService {
   constructor(
     @InjectRepository(TopicCandidateEntity)
     private readonly candidateRepository: Repository<TopicCandidateEntity>,
+    @InjectRepository(ArticleDraftEntity)
+    private readonly draftRepository: Repository<ArticleDraftEntity>,
+    @InjectQueue(ARTICLE_OUTLINE_QUEUE)
+    private readonly articleOutlineQueue: Queue,
   ) {}
 
   async saveMany(seedId: string, candidates: CandidatePayload[]): Promise<void> {
@@ -99,13 +130,91 @@ export class TopicCandidateService {
   async updateStatus(
     id: string,
     dto: UpdateTopicCandidateStatusDto,
-  ): Promise<TopicCandidateEntity> {
+  ): Promise<ApproveResult | RejectResult> {
+    if (dto.status === AllowedCandidateStatus.APPROVED) {
+      return this.approveCandidate(id);
+    }
+    return this.rejectCandidate(id);
+  }
+
+  private async approveCandidate(id: string): Promise<ApproveResult> {
+    const { draft, articleDraftCreated } =
+      await this.candidateRepository.manager.transaction(async (manager) => {
+        // 1. candidate 조회 및 상태 검증
+        const candidate = await manager.findOne(TopicCandidateEntity, {
+          where: { id },
+        });
+        if (!candidate) {
+          throw new NotFoundException(`TopicCandidate #${id} not found`);
+        }
+        if (candidate.status !== TopicCandidateStatus.PENDING) {
+          throw new ConflictException(
+            `TopicCandidate #${id} is not pending (current: ${candidate.status})`,
+          );
+        }
+
+        // 2. 대상 candidate approved
+        await manager.update(TopicCandidateEntity, { id }, {
+          status: TopicCandidateStatus.APPROVED,
+        });
+
+        // 3. 같은 seed의 다른 pending candidate 전부 rejected
+        await manager
+          .createQueryBuilder()
+          .update(TopicCandidateEntity)
+          .set({ status: TopicCandidateStatus.REJECTED })
+          .where('topicSeedId = :topicSeedId', { topicSeedId: candidate.topicSeedId })
+          .andWhere('id != :id', { id })
+          .andWhere('status = :status', { status: TopicCandidateStatus.PENDING })
+          .execute();
+
+        // 4. article_draft find-or-create
+        const existingDraft = await manager.findOne(ArticleDraftEntity, {
+          where: { topicCandidateId: id },
+        });
+
+        let draft: ArticleDraftEntity;
+        let articleDraftCreated: boolean;
+
+        if (existingDraft) {
+          draft = existingDraft;
+          articleDraftCreated = false;
+        } else {
+          const newDraft = manager.create(ArticleDraftEntity, {
+            topicCandidateId: id,
+            title: candidate.title,
+            keyword: candidate.keyword,
+            status: ArticleDraftStatus.QUEUED,
+          });
+          draft = await manager.save(newDraft);
+          articleDraftCreated = true;
+        }
+
+        return { draft, articleDraftCreated };
+      });
+
+    // 5. 트랜잭션 커밋 이후 enqueue
+    await this.articleOutlineQueue.add(GENERATE_ARTICLE_OUTLINE_JOB, {
+      articleDraftId: draft.id,
+    });
+
+    return {
+      id,
+      status: 'approved',
+      articleDraftId: draft.id,
+      articleDraftCreated,
+    };
+  }
+
+  private async rejectCandidate(id: string): Promise<RejectResult> {
     const candidate = await this.candidateRepository.findOne({ where: { id } });
     if (!candidate) {
       throw new NotFoundException(`TopicCandidate #${id} not found`);
     }
 
-    candidate.status = dto.status as unknown as TopicCandidateStatus;
-    return this.candidateRepository.save(candidate);
+    candidate.status = TopicCandidateStatus.REJECTED;
+    await this.candidateRepository.save(candidate);
+
+    return { id, status: 'rejected' };
   }
 }
