@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import axios from 'axios';
 import * as sharp from 'sharp';
 
 interface TextZone {
@@ -14,6 +13,12 @@ interface TemplateConfig {
   filename: string;
   textZone: TextZone;
 }
+
+const S3_BASE =
+  'https://blog-assets-441964862929-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/templates';
+
+const FONT_URL =
+  'https://fonts.gstatic.com/s/blackhansans/v17/ea8Aad44WunzF9a-dL6toA8r8nqVIXSkH-Hc.ttf';
 
 const TEMPLATES: TemplateConfig[] = [
   {
@@ -30,25 +35,28 @@ const TEMPLATES: TemplateConfig[] = [
   },
 ];
 
-const FONT_PATH = path.join(__dirname, 'fonts', 'BlackHanSans-Regular.ttf');
-
-const TEMPLATES_DIR = path.join(__dirname, 'templates');
-
 @Injectable()
 export class ThumbnailImageProcessingService implements OnModuleInit {
   private fontBase64: string;
   private templateBuffers: Map<string, Buffer> = new Map();
 
   async onModuleInit(): Promise<void> {
-    // 폰트 base64 인코딩 (1회)
-    const fontBuffer = await fs.readFile(FONT_PATH);
-    this.fontBase64 = fontBuffer.toString('base64');
+    // 폰트 다운로드 → base64 인코딩 (1회)
+    const fontRes = await axios.get<ArrayBuffer>(FONT_URL, {
+      responseType: 'arraybuffer',
+    });
+    this.fontBase64 = Buffer.from(fontRes.data).toString('base64');
 
-    // 템플릿 이미지 메모리 캐시 (1회)
-    for (const tpl of TEMPLATES) {
-      const buf = await fs.readFile(path.join(TEMPLATES_DIR, tpl.filename));
-      this.templateBuffers.set(tpl.filename, buf);
-    }
+    // 템플릿 이미지 다운로드 → 메모리 캐시 (1회)
+    await Promise.all(
+      TEMPLATES.map(async (tpl) => {
+        const res = await axios.get<ArrayBuffer>(
+          `${S3_BASE}/${tpl.filename}`,
+          { responseType: 'arraybuffer' },
+        );
+        this.templateBuffers.set(tpl.filename, Buffer.from(res.data));
+      }),
+    );
   }
 
   async processThumbnailWithText(title: string): Promise<Buffer> {
