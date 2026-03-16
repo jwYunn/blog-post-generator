@@ -52,7 +52,7 @@ FAQ:
 ${outline.faqs.map((f) => `- ${f}`).join('\n')}
 
 Structure rules:
-- Start with an introduction
+- Do NOT include the title at the top of the article. Start directly with the introduction body text
 - Each section should have explanation + examples
 - End with a short summary
 `;
