@@ -3,6 +3,10 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      { "include": "article-thumbnail/fonts/**/*", "watchAssets": true },
+      { "include": "article-thumbnail/templates/**/*", "watchAssets": true }
+    ]
   }
 }

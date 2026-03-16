@@ -30,22 +30,9 @@ const TEMPLATES: TemplateConfig[] = [
   },
 ];
 
-const FONT_PATH = path.join(
-  __dirname,
-  '..',
-  '..',
-  'article-thumbnail',
-  'fonts',
-  'BlackHanSans-Regular.ttf',
-);
+const FONT_PATH = path.join(__dirname, 'fonts', 'BlackHanSans-Regular.ttf');
 
-const TEMPLATES_DIR = path.join(
-  __dirname,
-  '..',
-  '..',
-  'article-thumbnail',
-  'templates',
-);
+const TEMPLATES_DIR = path.join(__dirname, 'templates');
 
 @Injectable()
 export class ThumbnailImageProcessingService implements OnModuleInit {
