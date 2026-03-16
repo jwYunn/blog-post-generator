@@ -4,9 +4,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
-import { ArticleOutline } from '../article-outline/article-outline.types';
-import { ArticleThumbnailPromptService } from './article-thumbnail-prompt.service';
-import { ReplicateImageService } from './replicate-image.service';
 import { ThumbnailImageProcessingService } from './thumbnail-image-processing.service';
 import { ThumbnailS3UploadService } from './thumbnail-s3-upload.service';
 import { ARTICLE_THUMBNAIL_QUEUE } from './article-thumbnail.constants';
@@ -20,8 +17,6 @@ export class ArticleThumbnailProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)
     private readonly draftRepository: Repository<ArticleDraftEntity>,
-    private readonly promptService: ArticleThumbnailPromptService,
-    private readonly replicateService: ReplicateImageService,
     private readonly imageProcessingService: ThumbnailImageProcessingService,
     private readonly s3UploadService: ThumbnailS3UploadService,
   ) {
@@ -39,40 +34,27 @@ export class ArticleThumbnailProcessor extends WorkerHost {
       throw new Error(`ArticleDraft #${articleDraftId} not found`);
     }
 
-    if (!draft.title || !draft.keyword) {
-      throw new Error(
-        `ArticleDraft #${articleDraftId} is missing title or keyword`,
-      );
+    if (!draft.title) {
+      throw new Error(`ArticleDraft #${articleDraftId} is missing title`);
     }
 
     draft.status = ArticleDraftStatus.GENERATING_THUMBNAIL;
     await this.draftRepository.save(draft);
 
     try {
-      // 1. 썸네일 프롬프트 생성
-      const prompt = this.promptService.buildThumbnailPrompt({
-        title: draft.title,
-        keyword: draft.keyword,
-        outline: draft.outline as unknown as ArticleOutline | null,
-      });
-
-      // 2. Replicate 이미지 생성 요청
-      const predictionId = await this.replicateService.createPrediction(prompt);
-
-      // 3. polling으로 이미지 URL 획득
-      const imageUrl = await this.replicateService.waitForImageUrl(predictionId);
-
-      // 4. 이미지 다운로드 및 sharp 후처리 (webp 1024x1024)
+      // 1. 템플릿에 텍스트 합성
       const fileBuffer =
-        await this.imageProcessingService.processThumbnailFromUrl(imageUrl);
+        await this.imageProcessingService.processThumbnailWithText(
+          draft.title,
+        );
 
-      // 5. S3 업로드
+      // 2. S3 업로드
       const uploadedUrl = await this.s3UploadService.uploadThumbnail(
         articleDraftId,
         fileBuffer,
       );
 
-      // 6. 결과 저장
+      // 3. 결과 저장
       draft.thumbnailImageUrl = uploadedUrl;
       draft.status = ArticleDraftStatus.REVIEW_READY;
       draft.errorMessage = null;
