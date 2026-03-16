@@ -70,9 +70,13 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     // SVG 생성
     const svgBuffer = this.buildSvgOverlay(lines, fontSize, tpl.textZone);
 
-    // sharp 합성 → 400x300 리사이즈 → webp
-    const outputBuffer = await sharp(templateBuffer)
+    // 1단계: SVG 텍스트 합성 (1152x896 원본 크기 유지)
+    const composited = await sharp(templateBuffer)
       .composite([{ input: svgBuffer, blend: 'over' }])
+      .toBuffer();
+
+    // 2단계: 400x300 리사이즈 → webp
+    const outputBuffer = await sharp(composited)
       .resize(400, 300, { fit: 'cover' })
       .webp({ quality: 85 })
       .toBuffer();

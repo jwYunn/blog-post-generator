@@ -46,13 +46,20 @@ export class ArticleContentProcessor extends WorkerHost {
     await this.draftRepository.save(draft);
 
     try {
-      const content = await this.articleContentAiService.generateContent({
-        title: draft.title,
-        keyword: draft.keyword,
-        outline: draft.outline as unknown as ArticleOutline,
-      });
+      const [content, hashtags] = await Promise.all([
+        this.articleContentAiService.generateContent({
+          title: draft.title,
+          keyword: draft.keyword,
+          outline: draft.outline as unknown as ArticleOutline,
+        }),
+        this.articleContentAiService.generateHashtags({
+          title: draft.title,
+          keyword: draft.keyword,
+        }),
+      ]);
 
       draft.content = content;
+      draft.hashtags = hashtags;
       draft.status = ArticleDraftStatus.CONTENT_GENERATED;
       draft.errorMessage = null;
       await this.draftRepository.save(draft);

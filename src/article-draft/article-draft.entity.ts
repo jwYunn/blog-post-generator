@@ -37,6 +37,9 @@ export class ArticleDraftEntity {
   @Column({ type: 'text', nullable: true })
   thumbnailImageUrl: string | null;
 
+  @Column({ type: 'jsonb', nullable: true })
+  hashtags: string[] | null;
+
   @Column({
     type: 'enum',
     enum: ArticleDraftStatus,

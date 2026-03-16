@@ -9,6 +9,11 @@ export interface GenerateContentInput {
   outline: ArticleOutline;
 }
 
+export interface GenerateHashtagsInput {
+  title: string;
+  keyword: string;
+}
+
 @Injectable()
 export class ArticleContentAiService {
   private readonly anthropic: Anthropic;
@@ -55,6 +60,7 @@ Structure rules:
 - Do NOT include the title at the top of the article. Start directly with the introduction body text
 - Each section should have explanation + examples
 - End with a short summary
+- Do NOT include a "관련 글 추천" or related articles section at the end
 `;
 
     const response = await this.anthropic.messages.create({
@@ -78,5 +84,47 @@ Structure rules:
     }
 
     return text;
+  }
+
+  async generateHashtags(input: GenerateHashtagsInput): Promise<string[]> {
+    const { title, keyword } = input;
+
+    const prompt = `Generate exactly 10 SEO-friendly hashtags for a Korean English-learning blog post.
+
+Title: ${title}
+Keyword: ${keyword}
+
+Rules:
+- Each hashtag must start with #
+- Mix Korean and English hashtags (roughly half each)
+- Focus on SEO value: include the main keyword, related topics, and search terms Korean learners would use
+- No spaces within a hashtag
+- Return ONLY a JSON array of strings, no explanation
+
+Example format: ["#영어공부", "#EnglishGrammar", "#영어표현", "#LearnEnglish", ...]`;
+
+    const response = await this.anthropic.messages.create({
+      model: 'claude-haiku-4-5',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const raw = response.content
+      .filter((c) => c.type === 'text')
+      .map((c: any) => c.text)
+      .join('');
+
+    // JSON 배열 파싱
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) {
+      throw new Error('Failed to parse hashtags response');
+    }
+
+    const parsed: unknown = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) {
+      throw new Error('Hashtags response is not an array');
+    }
+
+    return (parsed as string[]).slice(0, 10);
   }
 }
