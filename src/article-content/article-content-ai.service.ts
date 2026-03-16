@@ -32,6 +32,8 @@ Requirements:
 - Tone: friendly and educational
 - Language: Korean explanations + English examples
 - Use markdown format
+- Do NOT use blockquote syntax (>). Never start a line with >
+- Instead of blockquotes, use plain bullet lists (-). Each item on its own bullet line
 - Include clear explanations
 - Include example sentences
 - Avoid repeating phrases
