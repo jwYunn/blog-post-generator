@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
+import { stripTitleCategory } from '../common/utils/title.util';
 import { ThumbnailImageProcessingService } from './thumbnail-image-processing.service';
 import { ThumbnailS3UploadService } from './thumbnail-s3-upload.service';
 import { ARTICLE_THUMBNAIL_QUEUE } from './article-thumbnail.constants';
@@ -45,7 +46,7 @@ export class ArticleThumbnailProcessor extends WorkerHost {
       // 1. 템플릿에 텍스트 합성
       const fileBuffer =
         await this.imageProcessingService.processThumbnailWithText(
-          draft.title,
+          stripTitleCategory(draft.title),
         );
 
       // 2. S3 업로드
