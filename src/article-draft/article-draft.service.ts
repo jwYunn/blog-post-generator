@@ -17,6 +17,7 @@ import {
 } from './dto/query-article-draft-list.dto';
 import { TopicCandidateEntity } from '../topic-candidate/topic-candidate.entity';
 import { TopicCandidateStatus } from '../topic-candidate/enums/topic-candidate-status.enum';
+import { formatTitleWithCategory } from '../common/utils/title.util';
 import {
   ARTICLE_OUTLINE_QUEUE,
   GENERATE_ARTICLE_OUTLINE_JOB,
@@ -36,6 +37,7 @@ export class ArticleDraftService {
   async createFromCandidate(candidateId: string): Promise<ArticleDraftEntity> {
     const candidate = await this.candidateRepository.findOne({
       where: { id: candidateId },
+      relations: ['topicSeed'],
     });
     if (!candidate) {
       throw new NotFoundException(`TopicCandidate #${candidateId} not found`);
@@ -58,7 +60,7 @@ export class ArticleDraftService {
 
     const draft = this.draftRepository.create({
       topicCandidateId: candidateId,
-      title: candidate.title,
+      title: formatTitleWithCategory(candidate.topicSeed.category, candidate.title),
       keyword: candidate.keyword,
       status: ArticleDraftStatus.QUEUED,
     });

@@ -20,6 +20,7 @@ import {
 } from './dto/update-topic-candidate-status.dto';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
+import { formatTitleWithCategory } from '../common/utils/title.util';
 import {
   ARTICLE_OUTLINE_QUEUE,
   GENERATE_ARTICLE_OUTLINE_JOB,
@@ -143,6 +144,7 @@ export class TopicCandidateService {
         // 1. candidate 조회 및 상태 검증
         const candidate = await manager.findOne(TopicCandidateEntity, {
           where: { id },
+          relations: ['topicSeed'],
         });
         if (!candidate) {
           throw new NotFoundException(`TopicCandidate #${id} not found`);
@@ -182,7 +184,7 @@ export class TopicCandidateService {
         } else {
           const newDraft = manager.create(ArticleDraftEntity, {
             topicCandidateId: id,
-            title: candidate.title,
+            title: formatTitleWithCategory(candidate.topicSeed.category, candidate.title),
             keyword: candidate.keyword,
             status: ArticleDraftStatus.QUEUED,
           });
