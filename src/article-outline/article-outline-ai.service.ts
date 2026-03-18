@@ -36,6 +36,8 @@ Requirements:
 - Include example usage section (maximum 3)
 - Include common mistakes section (maximum 3)
 - Include FAQ suggestions (maximum 3)
+- Write all output fields in Korean
+- Keep English vocabulary being explained and SEO/technical terms in English as-is
 
 Return JSON ONLY.
 
@@ -43,9 +45,9 @@ Schema:
 {
   "title": string,
   "keyword": string,
-  "searchIntent": string,
-  "sections": string[],
-  "faqs": string[]  // max 5 items
+  "searchIntent": string,   // Korean sentence describing user intent
+  "sections": string[],     // Korean section titles, keeping target English words
+  "faqs": string[]          // Korean questions, keeping target English words. max 5 items
 }
 `;
 
