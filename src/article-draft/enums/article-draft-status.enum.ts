@@ -6,5 +6,7 @@ export enum ArticleDraftStatus {
   CONTENT_GENERATED = 'content_generated',
   GENERATING_THUMBNAIL = 'generating_thumbnail',
   REVIEW_READY = 'review_ready',
+  PUBLISHING = 'publishing',
+  PUBLISHED = 'published',
   FAILED = 'failed',
 }
