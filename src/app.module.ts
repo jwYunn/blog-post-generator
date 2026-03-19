@@ -13,7 +13,6 @@ import { ArticleDraftModule } from './article-draft/article-draft.module';
 import { ArticleOutlineModule } from './article-outline/article-outline.module';
 import { ArticleContentModule } from './article-content/article-content.module';
 import { ArticleThumbnailModule } from './article-thumbnail/article-thumbnail.module';
-import { BlogCssModule } from './blog-css/blog-css.module';
 
 @Module({
   imports: [
@@ -51,7 +50,6 @@ import { BlogCssModule } from './blog-css/blog-css.module';
     ArticleOutlineModule,
     ArticleContentModule,
     ArticleThumbnailModule,
-    BlogCssModule,
   ],
   controllers: [AppController],
   providers: [AppService],
