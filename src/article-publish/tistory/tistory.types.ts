@@ -1,5 +1,6 @@
 import { Page } from 'playwright';
 import { marked } from 'marked';
+// Page and marked are kept for potential future use in types
 
 export type PublishMode = { mode: 'now' } | { mode: 'schedule'; datetime: Date };
 
@@ -17,4 +18,10 @@ export interface TistorySessionProvider {
   getSession(): Promise<object | null>;
   saveSession(state: object): Promise<void>;
   deleteSession(): Promise<void>;
+}
+
+/** runTistoryPublish 반환 결과 */
+export interface TistoryPublishResult {
+  /** 발행된 글의 permalink. 추출 실패 시 null */
+  permalink: string | null;
 }

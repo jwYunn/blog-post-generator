@@ -4,7 +4,7 @@
  */
 import { Page, BrowserContext, chromium } from 'playwright';
 import { marked } from 'marked';
-import { PublishMode, TistoryDraftData, TistorySessionProvider } from './tistory.types';
+import { PublishMode, TistoryDraftData, TistoryPublishResult, TistorySessionProvider } from './tistory.types';
 
 const BLOG_NAME = process.env.TISTORY_BLOG_NAME || 'fromdeepwithin';
 
@@ -327,6 +327,23 @@ export async function createContextFromSession(
  * headless 여부와 waitForConfirm(Enter 대기 함수)을 외부에서 주입받아
  * 스크립트/프로세서 양쪽에서 재사용합니다.
  */
+/** posts.json 응답에서 id가 가장 큰 항목의 permalink 추출 */
+async function extractPermalinkFromPostsResponse(
+  responsePromise: Promise<import('playwright').Response>,
+): Promise<string | null> {
+  try {
+    const response = await responsePromise;
+    const body = (await response.json()) as {
+      items: Array<{ id: string; permalink: string }>;
+    };
+    if (!body.items?.length) return null;
+    const sorted = [...body.items].sort((a, b) => Number(b.id) - Number(a.id));
+    return sorted[0].permalink;
+  } catch {
+    return null;
+  }
+}
+
 export async function runTistoryPublish(opts: {
   draft: TistoryDraftData;
   publishMode: PublishMode;
@@ -336,7 +353,7 @@ export async function runTistoryPublish(opts: {
   headless?: boolean;
   /** 발행 전 사용자 확인이 필요한 경우 주입 (스크립트 전용) */
   waitForConfirm?: () => Promise<void>;
-}): Promise<void> {
+}): Promise<TistoryPublishResult> {
   const {
     draft,
     publishMode,
@@ -419,12 +436,28 @@ export async function runTistoryPublish(opts: {
       await waitForConfirm();
     }
 
-    // 8. 발행
+    // 8. 발행 (posts.json 응답 동시 캡처)
+    // waitForResponse는 Promise를 등록할 뿐이므로 #publish-btn 클릭 전에 먼저 등록해야 응답을 놓치지 않음
+    const postsJsonResponsePromise = page.waitForResponse(
+      (res) =>
+        res.url().includes(`${BLOG_NAME}.tistory.com/manage/posts.json`) &&
+        res.status() === 200,
+      { timeout: 30_000 },
+    );
+
     console.log('발행 중...');
     await handlePublishModal(page, publishMode);
 
-    console.log('\n✓ 발행 완료!');
+    // 9. permalink 추출
+    const permalink = await extractPermalinkFromPostsResponse(postsJsonResponsePromise);
+    if (permalink) {
+      console.log(`✓ 발행 완료! permalink: ${permalink}`);
+    } else {
+      console.log('✓ 발행 완료! (permalink 추출 실패)');
+    }
+
     await page.waitForTimeout(3_000);
+    return { permalink };
   } finally {
     // 최종 세션 저장 (로그아웃 없이 종료되는 경우 갱신)
     try {
@@ -435,4 +468,5 @@ export async function runTistoryPublish(opts: {
     }
     await browser.close();
   }
+  return { permalink: null };
 }
