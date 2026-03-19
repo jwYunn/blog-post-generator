@@ -1,6 +1,7 @@
-import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ArticleDraftService } from './article-draft.service';
 import { QueryArticleDraftListDto } from './dto/query-article-draft-list.dto';
+import { CreatePublishJobDto } from '../article-publish/dto/create-publish-job.dto';
 
 @Controller()
 export class ArticleDraftController {
@@ -21,5 +22,13 @@ export class ArticleDraftController {
   @Get('article-drafts/:id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.articleDraftService.findOne(id);
+  }
+
+  @Post('article-drafts/:id/publish')
+  publish(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CreatePublishJobDto,
+  ) {
+    return this.articleDraftService.publish(id, dto);
   }
 }

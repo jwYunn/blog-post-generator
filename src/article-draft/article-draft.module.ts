@@ -8,12 +8,14 @@ import { ArticleDraftService } from './article-draft.service';
 import { ArticleDraftController } from './article-draft.controller';
 import { TopicCandidateEntity } from '../topic-candidate/topic-candidate.entity';
 import { ARTICLE_OUTLINE_QUEUE } from '../article-outline/article-outline.constants';
+import { ArticlePublishModule } from '../article-publish/article-publish.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ArticleDraftEntity, TopicCandidateEntity]),
     BullModule.registerQueue({ name: ARTICLE_OUTLINE_QUEUE }),
     BullBoardModule.forFeature({ name: ARTICLE_OUTLINE_QUEUE, adapter: BullMQAdapter }),
+    ArticlePublishModule,
   ],
   controllers: [ArticleDraftController],
   providers: [ArticleDraftService],

@@ -11,11 +11,12 @@ export class ArticlePublishService {
     private readonly publishQueue: Queue,
   ) {}
 
-  async addPublishJob(articleDraftId: string, dto: CreatePublishJobDto): Promise<void> {
-    await this.publishQueue.add(PUBLISH_ARTICLE_JOB, {
+  async addPublishJob(articleDraftId: string, dto: CreatePublishJobDto): Promise<{ jobId: string }> {
+    const job = await this.publishQueue.add(PUBLISH_ARTICLE_JOB, {
       articleDraftId,
       mode: dto.mode,
       scheduledAt: dto.scheduledAt,
     });
+    return { jobId: String(job.id) };
   }
 }

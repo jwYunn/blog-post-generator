@@ -10,6 +10,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ArticleDraftEntity } from './article-draft.entity';
 import { ArticleDraftStatus } from './enums/article-draft-status.enum';
+import { ArticlePublishService } from '../article-publish/article-publish.service';
+import { CreatePublishJobDto } from '../article-publish/dto/create-publish-job.dto';
 import {
   DraftSortBy,
   DraftSortOrder,
@@ -32,6 +34,7 @@ export class ArticleDraftService {
     private readonly candidateRepository: Repository<TopicCandidateEntity>,
     @InjectQueue(ARTICLE_OUTLINE_QUEUE)
     private readonly articleOutlineQueue: Queue,
+    private readonly articlePublishService: ArticlePublishService,
   ) {}
 
   async createFromCandidate(candidateId: string): Promise<ArticleDraftEntity> {
@@ -108,5 +111,18 @@ export class ArticleDraftService {
       throw new NotFoundException(`ArticleDraft #${id} not found`);
     }
     return draft;
+  }
+
+  async publish(id: string, dto: CreatePublishJobDto): Promise<{ jobId: string }> {
+    const draft = await this.findOne(id);
+
+    if (draft.status === ArticleDraftStatus.PUBLISHING) {
+      throw new ConflictException(`ArticleDraft #${id} is already being published`);
+    }
+    if (draft.status === ArticleDraftStatus.PUBLISHED) {
+      throw new ConflictException(`ArticleDraft #${id} is already published`);
+    }
+
+    return this.articlePublishService.addPublishJob(id, dto);
   }
 }
