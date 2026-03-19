@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
+import { ArticlePublishRecordEntity, PublishSchedule } from './article-publish-record.entity';
 import { TistorySessionService } from './tistory/tistory-session.service';
 import { runTistoryPublish } from './tistory/tistory-automation';
 import { PublishMode } from './tistory/tistory.types';
@@ -20,6 +21,8 @@ export class ArticlePublishProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)
     private readonly draftRepository: Repository<ArticleDraftEntity>,
+    @InjectRepository(ArticlePublishRecordEntity)
+    private readonly publishRecordRepository: Repository<ArticlePublishRecordEntity>,
     private readonly tistorySessionService: TistorySessionService,
   ) {
     super();
@@ -54,7 +57,7 @@ export class ArticlePublishProcessor extends WorkerHost {
           ? { mode: 'schedule', datetime: new Date(scheduledAt) }
           : { mode: 'now' };
 
-      await runTistoryPublish({
+      const { permalink } = await runTistoryPublish({
         draft: {
           title: draft.title,
           content: draft.content,
@@ -72,6 +75,19 @@ export class ArticlePublishProcessor extends WorkerHost {
       draft.status = ArticleDraftStatus.PUBLISHED;
       draft.errorMessage = null;
       await this.draftRepository.save(draft);
+
+      const schedule: PublishSchedule =
+        mode === 'schedule' && scheduledAt
+          ? { mode: 'schedule', scheduledAt }
+          : { mode: 'now' };
+
+      const record = this.publishRecordRepository.create({
+        draftId: articleDraftId,
+        permalink,
+        schedule,
+        meta: null,
+      });
+      await this.publishRecordRepository.save(record);
     } catch (error) {
       draft.status = ArticleDraftStatus.FAILED;
       draft.errorMessage =
