@@ -27,8 +27,16 @@
       "name": "Run: Active TS File",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["ts-node", "-r", "tsconfig-paths/register", "${file}"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "--require",
+        "${workspaceFolder}/node_modules/ts-node/register",
+        "--require",
+        "${workspaceFolder}/node_modules/tsconfig-paths/register"
+      ],
+      "args": ["${file}"],
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true,
       "console": "integratedTerminal",
       "envFile": "${workspaceFolder}/.env",
       "skipFiles": ["<node_internals>/**"]
