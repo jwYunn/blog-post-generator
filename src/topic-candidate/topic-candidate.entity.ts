@@ -43,7 +43,7 @@ export class TopicCandidateEntity {
   @Column({ type: 'jsonb', nullable: true })
   outlinePreview: string[] | null;
 
-  @Column({ type: 'int', nullable: true })
+  @Column({ type: 'decimal', precision: 5, scale: 2, nullable: true })
   overallScore: number | null;
 
   @Column({ type: 'int', nullable: true })
