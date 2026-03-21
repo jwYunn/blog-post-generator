@@ -14,6 +14,8 @@ export enum CandidateSortBy {
   CREATED_AT = 'createdAt',
   SCORE = 'score',
   TITLE = 'title',
+  OVERALL_SCORE = 'overallScore',
+  RANK = 'rank',
 }
 
 export enum CandidateSortOrder {
