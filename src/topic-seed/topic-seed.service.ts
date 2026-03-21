@@ -16,6 +16,10 @@ import {
   TOPIC_GENERATE_QUEUE,
   GENERATE_TOPIC_CANDIDATES_JOB,
 } from '../topic-generate/topic-generate.constants';
+import {
+  TOPIC_EVALUATE_QUEUE,
+  EVALUATE_TOPIC_CANDIDATES_JOB,
+} from '../topic-evaluate/topic-evaluate.constants';
 
 @Injectable()
 export class TopicSeedService {
@@ -24,6 +28,8 @@ export class TopicSeedService {
     private readonly topicSeedRepository: Repository<TopicSeedEntity>,
     @InjectQueue(TOPIC_GENERATE_QUEUE)
     private readonly topicGenerateQueue: Queue,
+    @InjectQueue(TOPIC_EVALUATE_QUEUE)
+    private readonly topicEvaluateQueue: Queue,
   ) {}
 
   private normalize(seed: string): string {
@@ -141,6 +147,20 @@ export class TopicSeedService {
 
     return {
       message: 'Topic generation job has been queued.',
+      seedId: id,
+    };
+  }
+
+  async evaluate(id: string): Promise<{ message: string; seedId: string }> {
+    const seed = await this.findOne(id);
+
+    await this.topicEvaluateQueue.add(EVALUATE_TOPIC_CANDIDATES_JOB, {
+      seedId: id,
+      userInput: seed.seed,
+    });
+
+    return {
+      message: 'Topic evaluation job has been queued.',
       seedId: id,
     };
   }

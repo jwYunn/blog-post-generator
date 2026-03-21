@@ -68,4 +68,9 @@ export class TopicSeedController {
   generate(@Param('id', ParseUUIDPipe) id: string) {
     return this.topicSeedService.generate(id);
   }
+
+  @Post(':id/evaluate')
+  evaluate(@Param('id', ParseUUIDPipe) id: string) {
+    return this.topicSeedService.evaluate(id);
+  }
 }

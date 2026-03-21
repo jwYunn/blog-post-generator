@@ -42,7 +42,8 @@ export interface EvaluationPayload {
   rank: number;
   strengths: string[];
   weaknesses: string[];
-  verdict: string;
+  verdict: 'keep' | 'consider' | 'drop';
+  evaluationDetail: Record<string, number> | null;
 }
 
 type ApproveResult = {
@@ -255,6 +256,7 @@ export class TopicCandidateService {
           strengths: e.strengths,
           weaknesses: e.weaknesses,
           verdict: e.verdict,
+          evaluationDetail: e.evaluationDetail,
         }),
       ),
     );

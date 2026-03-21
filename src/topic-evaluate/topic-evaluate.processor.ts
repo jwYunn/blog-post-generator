@@ -24,7 +24,7 @@ export class TopicEvaluateProcessor extends WorkerHost {
   async process(job: Job<EvaluateJobPayload>): Promise<void> {
     if (job.name !== EVALUATE_TOPIC_CANDIDATES_JOB) return;
 
-    const { seedId, userInput } = job.data;
+    const { seedId } = job.data;
     this.logger.log(`Processing evaluation job for seedId: ${seedId}`);
 
     const candidates = await this.topicCandidateService.findBySeedId(seedId);
@@ -39,13 +39,11 @@ export class TopicEvaluateProcessor extends WorkerHost {
       primary_keyword: c.keyword,
       search_intent: c.searchIntent,
       target_reader: c.targetReader,
+      why_this_topic: c.whyThisTopic,
       outline_preview: c.outlinePreview,
     }));
 
-    const evaluations = await this.topicEvaluateAiService.evaluateCandidates(
-      userInput,
-      candidateInputs,
-    );
+    const evaluations = await this.topicEvaluateAiService.evaluateCandidates(candidateInputs);
 
     await this.topicCandidateService.saveEvaluations(evaluations);
 

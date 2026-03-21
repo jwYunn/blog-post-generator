@@ -55,8 +55,11 @@ export class TopicCandidateEntity {
   @Column({ type: 'jsonb', nullable: true })
   weaknesses: string[] | null;
 
-  @Column({ type: 'text', nullable: true })
-  verdict: string | null;
+  @Column({ type: 'varchar', length: 10, nullable: true })
+  verdict: 'keep' | 'consider' | 'drop' | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  evaluationDetail: Record<string, number> | null;
 
   @Column({
     type: 'enum',

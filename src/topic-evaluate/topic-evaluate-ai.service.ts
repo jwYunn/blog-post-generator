@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 import { TOPIC_EVALUATE_PROMPT } from './topic-evaluate-prompt';
 import type { EvaluationPayload } from '../topic-candidate/topic-candidate.service';
 
@@ -10,60 +10,72 @@ interface CandidateInput {
   primary_keyword: string;
   search_intent: string | null;
   target_reader: string | null;
+  why_this_topic: string | null;
   outline_preview: string[] | null;
+}
+
+interface EvaluationDetail extends Record<string, number> {
+  search_intent_clarity: number;
+  topic_specificity: number;
+  seo_title_quality: number;
+  practical_value: number;
+  outline_feasibility: number;
+  uniqueness: number;
 }
 
 interface RawEvaluationItem {
   id: string;
+  title: string;
+  primary_keyword: string;
   overall_score: number;
   rank: number;
+  evaluation: EvaluationDetail;
   strengths: string[];
   weaknesses: string[];
-  verdict: string;
+  verdict: 'keep' | 'consider' | 'drop';
 }
 
 @Injectable()
 export class TopicEvaluateAiService {
   private readonly logger = new Logger(TopicEvaluateAiService.name);
-  private readonly anthropic: Anthropic;
+  private readonly openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
-    this.anthropic = new Anthropic({
-      apiKey: this.configService.get<string>('ANTHROPIC_API_KEY'),
+    this.openai = new OpenAI({
+      apiKey: this.configService.get<string>('OPENAI_API_KEY'),
     });
   }
 
   async evaluateCandidates(
-    userInput: string,
     candidates: CandidateInput[],
   ): Promise<EvaluationPayload[]> {
-    const prompt = TOPIC_EVALUATE_PROMPT
-      .replace('{{USER_INPUT}}', userInput)
-      .replace('{{CANDIDATES}}', JSON.stringify(candidates, null, 2));
+    const prompt = TOPIC_EVALUATE_PROMPT.replace(
+      '{{CANDIDATES}}',
+      JSON.stringify(candidates, null, 2),
+    );
 
-    this.logger.log(`Calling Claude to evaluate ${candidates.length} candidates for: "${userInput}"`);
+    this.logger.log(`Calling GPT to evaluate ${candidates.length} candidates`);
 
-    const message = await this.anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 4096,
+    const response = await this.openai.chat.completions.create({
+      model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
+      max_tokens: 8192,
     });
 
-    const text =
-      message.content[0].type === 'text' ? message.content[0].text : '';
+    const text = response.choices[0]?.message?.content ?? '';
 
     let items: RawEvaluationItem[];
     try {
       const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
       items = JSON.parse(clean) as RawEvaluationItem[];
     } catch {
-      this.logger.error('Failed to parse Claude evaluation response. Raw response:');
+      this.logger.error('Failed to parse GPT evaluation response. Raw response:');
       this.logger.error(text);
-      throw new Error('Invalid JSON response from Claude evaluation');
+      throw new Error('Invalid JSON response from GPT evaluation');
     }
 
     if (!Array.isArray(items)) {
-      throw new Error('Claude evaluation did not return an array');
+      throw new Error('GPT evaluation did not return an array');
     }
 
     return items.map((item) => ({
@@ -72,7 +84,8 @@ export class TopicEvaluateAiService {
       rank: item.rank ?? 0,
       strengths: Array.isArray(item.strengths) ? item.strengths : [],
       weaknesses: Array.isArray(item.weaknesses) ? item.weaknesses : [],
-      verdict: item.verdict ?? '',
+      verdict: item.verdict ?? 'consider',
+      evaluationDetail: item.evaluation ?? null,
     }));
   }
 }
