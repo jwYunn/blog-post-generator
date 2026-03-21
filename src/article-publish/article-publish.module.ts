@@ -15,7 +15,13 @@ import { ARTICLE_PUBLISH_QUEUE } from './constants';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ArticleDraftEntity, ArticlePublishRecordEntity]),
-    BullModule.registerQueue({ name: ARTICLE_PUBLISH_QUEUE }),
+    BullModule.registerQueue({
+      name: ARTICLE_PUBLISH_QUEUE,
+      defaultJobOptions: {
+        removeOnComplete: { age: 604_800 },
+        removeOnFail: { age: 604_800 },
+      },
+    }),
     BullBoardModule.forFeature({ name: ARTICLE_PUBLISH_QUEUE, adapter: BullMQAdapter }),
   ],
   controllers: [ArticlePublishRecordController],

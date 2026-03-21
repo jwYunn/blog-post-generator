@@ -13,7 +13,13 @@ import { ArticlePublishModule } from '../article-publish/article-publish.module'
 @Module({
   imports: [
     TypeOrmModule.forFeature([ArticleDraftEntity, TopicCandidateEntity]),
-    BullModule.registerQueue({ name: ARTICLE_OUTLINE_QUEUE }),
+    BullModule.registerQueue({
+      name: ARTICLE_OUTLINE_QUEUE,
+      defaultJobOptions: {
+        removeOnComplete: { age: 604_800 },
+        removeOnFail: { age: 604_800 },
+      },
+    }),
     BullBoardModule.forFeature({ name: ARTICLE_OUTLINE_QUEUE, adapter: BullMQAdapter }),
     ArticlePublishModule,
   ],

@@ -10,8 +10,20 @@ import { ARTICLE_CONTENT_QUEUE } from '../article-content/article-content.consta
 @Module({
   imports: [
     TypeOrmModule.forFeature([ArticleDraftEntity]),
-    BullModule.registerQueue({ name: ARTICLE_OUTLINE_QUEUE }),
-    BullModule.registerQueue({ name: ARTICLE_CONTENT_QUEUE }),
+    BullModule.registerQueue({
+      name: ARTICLE_OUTLINE_QUEUE,
+      defaultJobOptions: {
+        removeOnComplete: { age: 604_800 },
+        removeOnFail: { age: 604_800 },
+      },
+    }),
+    BullModule.registerQueue({
+      name: ARTICLE_CONTENT_QUEUE,
+      defaultJobOptions: {
+        removeOnComplete: { age: 604_800 },
+        removeOnFail: { age: 604_800 },
+      },
+    }),
   ],
   providers: [ArticleOutlineProcessor, ArticleOutlineAiService],
 })

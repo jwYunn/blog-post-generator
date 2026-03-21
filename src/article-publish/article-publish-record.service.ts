@@ -26,6 +26,7 @@ export class ArticlePublishRecordService {
 
     const qb = this.recordRepository
       .createQueryBuilder('r')
+      .leftJoinAndSelect('r.draft', 'draft')
       .orderBy('r.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -55,6 +56,7 @@ export class ArticlePublishRecordService {
 
     const qb = this.recordRepository
       .createQueryBuilder('r')
+      .leftJoinAndSelect('r.draft', 'draft')
       .where('r.draftId = :draftId', { draftId })
       .orderBy('r.createdAt', 'DESC')
       .skip((page - 1) * limit)

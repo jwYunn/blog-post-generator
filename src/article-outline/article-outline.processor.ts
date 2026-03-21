@@ -16,7 +16,7 @@ interface ArticleOutlineJobPayload {
   articleDraftId: string;
 }
 
-@Processor(ARTICLE_OUTLINE_QUEUE)
+@Processor(ARTICLE_OUTLINE_QUEUE, { concurrency: 3 })
 export class ArticleOutlineProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)

@@ -31,6 +31,18 @@ export class TopicCandidateEntity {
   @Column({ type: 'int', default: 0 })
   score: number;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  searchIntent: string | null;
+
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  targetReader: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  whyThisTopic: string | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  outlinePreview: string[] | null;
+
   @Column({
     type: 'enum',
     enum: TopicCandidateStatus,

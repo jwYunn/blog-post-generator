@@ -16,7 +16,7 @@ interface ArticlePublishJobPayload {
   scheduledAt?: string; // ISO string
 }
 
-@Processor(ARTICLE_PUBLISH_QUEUE)
+@Processor(ARTICLE_PUBLISH_QUEUE, { concurrency: 1 })
 export class ArticlePublishProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)

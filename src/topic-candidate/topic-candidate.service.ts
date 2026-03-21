@@ -30,6 +30,10 @@ export interface CandidatePayload {
   keyword: string;
   title: string;
   score: number;
+  searchIntent: string | null;
+  targetReader: string | null;
+  whyThisTopic: string | null;
+  outlinePreview: string[] | null;
 }
 
 type ApproveResult = {
@@ -73,6 +77,10 @@ export class TopicCandidateService {
           keyword: c.keyword,
           title: c.title,
           score: c.score,
+          searchIntent: c.searchIntent,
+          targetReader: c.targetReader,
+          whyThisTopic: c.whyThisTopic,
+          outlinePreview: c.outlinePreview,
           status: TopicCandidateStatus.PENDING,
         }),
       );

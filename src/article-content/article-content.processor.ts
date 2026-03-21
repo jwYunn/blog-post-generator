@@ -17,7 +17,7 @@ interface ArticleContentJobPayload {
   articleDraftId: string;
 }
 
-@Processor(ARTICLE_CONTENT_QUEUE)
+@Processor(ARTICLE_CONTENT_QUEUE, { concurrency: 3 })
 export class ArticleContentProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)
