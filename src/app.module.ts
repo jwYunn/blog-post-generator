@@ -14,6 +14,7 @@ import { ArticleOutlineModule } from './article-outline/article-outline.module';
 import { ArticleContentModule } from './article-content/article-content.module';
 import { ArticleThumbnailModule } from './article-thumbnail/article-thumbnail.module';
 import { ArticlePublishModule } from './article-publish/article-publish.module';
+import { TopicEvaluateModule } from './topic-evaluate/topic-evaluate.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ArticlePublishModule } from './article-publish/article-publish.module';
     }),
     TopicSeedModule,
     TopicGenerateModule,
+    TopicEvaluateModule,
     TopicCandidateModule,
     ArticleDraftModule,
     ArticleOutlineModule,

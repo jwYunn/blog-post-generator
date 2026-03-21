@@ -36,6 +36,15 @@ export interface CandidatePayload {
   outlinePreview: string[] | null;
 }
 
+export interface EvaluationPayload {
+  id: string;
+  overallScore: number;
+  rank: number;
+  strengths: string[];
+  weaknesses: string[];
+  verdict: string;
+}
+
 type ApproveResult = {
   id: string;
   status: 'approved';
@@ -226,5 +235,28 @@ export class TopicCandidateService {
     await this.candidateRepository.save(candidate);
 
     return { id, status: 'rejected' };
+  }
+
+  async findBySeedId(seedId: string): Promise<TopicCandidateEntity[]> {
+    return this.candidateRepository.find({
+      where: { topicSeedId: seedId },
+      order: { createdAt: 'ASC' },
+    });
+  }
+
+  async saveEvaluations(evaluations: EvaluationPayload[]): Promise<void> {
+    if (evaluations.length === 0) return;
+
+    await Promise.all(
+      evaluations.map((e) =>
+        this.candidateRepository.update(e.id, {
+          overallScore: e.overallScore,
+          rank: e.rank,
+          strengths: e.strengths,
+          weaknesses: e.weaknesses,
+          verdict: e.verdict,
+        }),
+      ),
+    );
   }
 }

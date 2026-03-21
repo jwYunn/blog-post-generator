@@ -43,6 +43,21 @@ export class TopicCandidateEntity {
   @Column({ type: 'jsonb', nullable: true })
   outlinePreview: string[] | null;
 
+  @Column({ type: 'int', nullable: true })
+  overallScore: number | null;
+
+  @Column({ type: 'int', nullable: true })
+  rank: number | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  strengths: string[] | null;
+
+  @Column({ type: 'jsonb', nullable: true })
+  weaknesses: string[] | null;
+
+  @Column({ type: 'text', nullable: true })
+  verdict: string | null;
+
   @Column({
     type: 'enum',
     enum: TopicCandidateStatus,
