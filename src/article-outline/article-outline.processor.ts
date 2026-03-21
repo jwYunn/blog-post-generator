@@ -33,6 +33,7 @@ export class ArticleOutlineProcessor extends WorkerHost {
 
     const draft = await this.draftRepository.findOne({
       where: { id: articleDraftId },
+      relations: ['topicCandidate'],
     });
     if (!draft) {
       throw new Error(`ArticleDraft #${articleDraftId} not found`);
@@ -42,9 +43,14 @@ export class ArticleOutlineProcessor extends WorkerHost {
     await this.draftRepository.save(draft);
 
     try {
+      const candidate = draft.topicCandidate;
+
       const outline = await this.articleOutlineAiService.generateOutline(
         draft.title,
         draft.keyword,
+        candidate?.searchIntent ?? null,
+        candidate?.targetReader ?? null,
+        candidate?.outlinePreview ?? null,
       );
 
       draft.outline = outline;
