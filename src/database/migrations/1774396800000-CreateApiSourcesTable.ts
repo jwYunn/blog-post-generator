@@ -8,8 +8,8 @@ export class CreateApiSourcesTable1774396800000 implements MigrationInterface {
         name       VARCHAR(100) NOT NULL,
         url        VARCHAR(500) NOT NULL,
         meta       JSONB,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        "createdAt" TIMESTAMPTZ NOT NULL DEFAULT now(),
+        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
   }
