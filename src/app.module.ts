@@ -15,6 +15,7 @@ import { ArticleContentModule } from './article-content/article-content.module';
 import { ArticleThumbnailModule } from './article-thumbnail/article-thumbnail.module';
 import { ArticlePublishModule } from './article-publish/article-publish.module';
 import { TopicEvaluateModule } from './topic-evaluate/topic-evaluate.module';
+import { ApiSourceModule } from './api-source/api-source.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { TopicEvaluateModule } from './topic-evaluate/topic-evaluate.module';
     ArticleContentModule,
     ArticleThumbnailModule,
     ArticlePublishModule,
+    ApiSourceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
