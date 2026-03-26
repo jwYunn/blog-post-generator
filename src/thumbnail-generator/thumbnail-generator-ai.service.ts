@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Replicate from 'replicate';
+import type ReplicateType from 'replicate';
 import type { ThumbnailPromptMeta } from './entities/thumbnail-prompt.entity';
+
+// module.exports = Replicate (클래스 직접 export) 이므로 require로 받아야 함
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const ReplicateSDK = require('replicate') as typeof ReplicateType;
 
 export interface ReplicateOutput {
   buffer: Buffer;
@@ -11,10 +15,10 @@ export interface ReplicateOutput {
 @Injectable()
 export class ThumbnailGeneratorAiService {
   private readonly logger = new Logger(ThumbnailGeneratorAiService.name);
-  private readonly replicate: Replicate;
+  private readonly replicate: ReplicateType;
 
   constructor(private readonly configService: ConfigService) {
-    this.replicate = new Replicate({
+    this.replicate = new ReplicateSDK({
       auth: this.configService.get<string>('REPLICATE_API_TOKEN'),
     });
   }
