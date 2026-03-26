@@ -16,6 +16,7 @@ import { ArticleThumbnailModule } from './article-thumbnail/article-thumbnail.mo
 import { ArticlePublishModule } from './article-publish/article-publish.module';
 import { TopicEvaluateModule } from './topic-evaluate/topic-evaluate.module';
 import { ApiSourceModule } from './api-source/api-source.module';
+import { ThumbnailGeneratorModule } from './thumbnail-generator/thumbnail-generator.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ApiSourceModule } from './api-source/api-source.module';
     ArticleThumbnailModule,
     ArticlePublishModule,
     ApiSourceModule,
+    ThumbnailGeneratorModule,
   ],
   controllers: [AppController],
   providers: [AppService],
