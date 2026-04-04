@@ -30,19 +30,26 @@ export class ArticleContentAiService {
     const prompt = `
 You are an expert English-learning blog writer.
 
-Write a blog article based on the following outline.
+Write a concise blog article based on the following outline.
 
 Requirements:
 - Audience: Korean learners studying English
-- Tone: friendly and educational
+- Tone: friendly, practical, and educational
 - Language: Korean explanations + English examples
 - Use markdown format
 - Do NOT use blockquote syntax (>). Never start a line with >
 - Instead of blockquotes, use plain bullet lists (-). Each item on its own bullet line
-- Include clear explanations
-- Include example sentences
-- Avoid repeating phrases
-- Keep SEO in mind
+- Prioritize clarity and usefulness over completeness
+- Keep the article concise and easy to skim
+- Target length: 1,800 to 2,500 Korean characters
+- Hard maximum: 3,000 Korean characters
+- Avoid repetitive explanations or saying the same point in different words
+- Avoid textbook-style writing, long background explanations, and unnecessary theory
+- Keep SEO in mind, but do not sacrifice readability for SEO
+- Use only the most useful examples
+- Maximum 2 or 3 example sentences per section
+- Keep each section focused and compact
+- Do not over-explain obvious points
 
 Title:
 ${title}
@@ -58,7 +65,11 @@ ${outline.faqs.map((f) => `- ${f}`).join('\n')}
 
 Structure rules:
 - Do NOT include the title at the top of the article. Start directly with the introduction body text
-- Each section should have explanation + examples
+- Write a short introduction in 2 to 3 sentences
+- Create one markdown heading per section from the outline
+- Each section should include a brief explanation and a small number of examples
+- If a section can be explained simply, keep it short
+- Add FAQ only if it adds real search value; keep it brief
 - End with a short summary
 - Do NOT include a "관련 글 추천" or related articles section at the end
 `;

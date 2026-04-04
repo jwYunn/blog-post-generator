@@ -6,7 +6,7 @@ Your goal is to generate high-quality blog topic candidates.
 {{USER_INPUT}}
 
 ## Requirements
-- Generate 20 diverse candidates
+- Generate 10 diverse candidates
 - Each candidate must target a clear and specific search intent
 - Avoid duplicates or very similar topics
 - Avoid topics that are too broad (e.g. "learn English", "English grammar")
