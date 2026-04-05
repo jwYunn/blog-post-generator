@@ -1,7 +1,3 @@
-import { Page } from 'playwright';
-import { marked } from 'marked';
-// Page and marked are kept for potential future use in types
-
 export type PublishMode = { mode: 'now' } | { mode: 'schedule'; datetime: Date };
 
 export interface TistoryDraftData {
