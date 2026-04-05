@@ -4,8 +4,6 @@ import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullBoardModule } from '@bull-board/nestjs';
 import { ExpressAdapter } from '@bull-board/express';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { TopicSeedModule } from './topic-seed/topic-seed.module';
 import { TopicGenerateModule } from './topic-generate/topic-generate.module';
 import { TopicCandidateModule } from './topic-candidate/topic-candidate.module';
@@ -59,7 +57,5 @@ import { ThumbnailGeneratorModule } from './thumbnail-generator/thumbnail-genera
     ApiSourceModule,
     ThumbnailGeneratorModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}
