@@ -2,18 +2,16 @@
  * 티스토리 Playwright 자동화 함수 모음
  * NestJS Processor와 standalone 스크립트 양쪽에서 공유합니다.
  */
+import { Logger } from '@nestjs/common';
 import { Page, BrowserContext, chromium } from 'playwright';
 import { marked } from 'marked';
 import { PublishMode, TistoryDraftData, TistoryPublishResult, TistorySessionProvider } from './tistory.types';
+import { stripTitleCategory } from '../../common/utils/title.util';
 
 const BLOG_NAME = process.env.TISTORY_BLOG_NAME || 'fromdeepwithin';
+const logger = new Logger('TistoryAutomation');
 
 // ─── 유틸 ───────────────────────────────────────────────────────────────────
-
-/** [Category] 프리픽스 제거 */
-export function stripCategory(title: string): string {
-  return title.replace(/^\[[^\]]+\]\s*/, '');
-}
 
 /** 마크다운 → HTML 변환 */
 export function markdownToHtml(markdown: string): string {
@@ -26,7 +24,7 @@ export function buildHtmlContent(draft: TistoryDraftData): string {
   if (draft.thumbnailImageUrl) {
     parts.push(
       `<div style="text-align: center; margin-bottom: 24px;">` +
-        `<img src="${draft.thumbnailImageUrl}" alt="${stripCategory(draft.title)}" style="max-width: 100%;">` +
+        `<img src="${draft.thumbnailImageUrl}" alt="${stripTitleCategory(draft.title)}" style="max-width: 100%;">` +
         `</div>`,
     );
   }
@@ -66,7 +64,7 @@ export async function kakaoLogin(
   mobileAuthTimeoutMs = 300_000,
 ): Promise<void> {
   // 1. "카카오계정으로 로그인" 버튼 클릭
-  console.log('  카카오계정으로 로그인 버튼 클릭...');
+  logger.log('카카오계정으로 로그인 버튼 클릭');
   await page.waitForSelector('a.btn_login.link_kakao_id', { timeout: 10_000 });
   await page.click('a.btn_login.link_kakao_id');
 
@@ -74,11 +72,11 @@ export async function kakaoLogin(
   await page.waitForSelector('#loginId--1', { timeout: 10_000 });
 
   // 3. ID 입력 (불규칙 타이핑)
-  console.log('  ID 입력...');
+  logger.log('ID 입력');
   await humanType(page, '#loginId--1', kakaoId);
 
   // 4. 비밀번호 입력 (불규칙 타이핑)
-  console.log('  비밀번호 입력...');
+  logger.log('비밀번호 입력');
   await humanType(page, '#password--2', kakaoPassword);
 
   // 5. 버튼 클릭 전 살짝 대기 (0.8~1.5초)
@@ -86,24 +84,24 @@ export async function kakaoLogin(
   await page.waitForTimeout(preClickDelay);
 
   // 6. 로그인 버튼 클릭
-  console.log('  로그인 버튼 클릭...');
+  logger.log('로그인 버튼 클릭');
   await page.click('button[type="submit"].btn_g.highlight.submit');
 
   // 7. 모바일 인증 대기
-  console.log(`\n📱 모바일 인증이 필요하면 완료해주세요. 최대 ${mobileAuthTimeoutMs / 60_000}분 대기합니다...`);
+  logger.log(`모바일 인증 대기 중 (최대 ${mobileAuthTimeoutMs / 60_000}분)`);
   await page.waitForSelector('button.btn_agree[name="user_oauth_approval"]', {
     timeout: mobileAuthTimeoutMs,
   });
 
   // 8. Continue 버튼 클릭
-  console.log('  Continue 버튼 클릭...');
+  logger.log('Continue 버튼 클릭');
   await page.click('button.btn_agree[name="user_oauth_approval"]');
 
   // 9. 관리 페이지 도달 대기
   await page.waitForURL(`**//${BLOG_NAME}.tistory.com/manage**`, {
     timeout: 30_000,
   });
-  console.log('✓ 로그인 완료');
+  logger.log('로그인 완료');
 }
 
 // ─── 에디터 헬퍼 ────────────────────────────────────────────────────────────
@@ -123,12 +121,12 @@ export async function selectCategory(
     const normalized = label.replace(/^-\s*/, '').trim();
     if (normalized.toLowerCase() === category.toLowerCase()) {
       await item.click();
-      console.log(`✓ 카테고리 선택: "${label}"`);
+      logger.log(`카테고리 선택: "${label}"`);
       return;
     }
   }
 
-  console.log(`⚠️  카테고리 "${category}"와 일치하는 항목을 찾지 못했습니다. 기본값 유지.`);
+  logger.warn(`카테고리 "${category}"와 일치하는 항목을 찾지 못했습니다. 기본값 유지.`);
   await page.keyboard.press('Escape');
 }
 
@@ -158,7 +156,7 @@ export async function fillHtmlViaModal(
 
   // 4. 모달 대기
   await page.waitForSelector('.mce-codeblock-dialog', { timeout: 5_000 });
-  console.log('  HTML 삽입 모달 열림');
+  logger.log('HTML 삽입 모달 열림');
 
   // 5. CodeMirror JS API로 HTML 주입
   const injected = await page.evaluate((content: string) => {
@@ -182,12 +180,12 @@ export async function fillHtmlViaModal(
   if (!injected) {
     throw new Error('HTML 모달 CodeMirror에 내용을 주입하지 못했습니다.');
   }
-  console.log('✓ HTML 내용 주입 완료');
+  logger.log('HTML 내용 주입 완료');
 
   // 6. 확인 버튼 클릭
   await page.click('.mce-codeblock-btn-submit button');
   await page.waitForTimeout(500);
-  console.log('✓ HTML 블럭 삽입 완료');
+  logger.log('HTML 블럭 삽입 완료');
 }
 
 /** 해시태그 입력 (최대 10개, 각 태그 입력 후 Tab) */
@@ -210,7 +208,7 @@ export async function fillHashtags(
     await page.waitForTimeout(200);
   }
 
-  console.log(`✓ 해시태그 ${tags.length}개 입력 완료`);
+  logger.log(`해시태그 ${tags.length}개 입력 완료`);
 }
 
 /** 캘린더를 목표 연/월까지 이동 */
@@ -249,17 +247,17 @@ export async function handlePublishModal(
   await page.waitForSelector('#publish-layer-btn', { timeout: 10_000 });
   await page.click('#publish-layer-btn');
   await page.waitForSelector('.ReactModal__Content', { timeout: 10_000 });
-  console.log('  발행 모달 열림');
+  logger.log('발행 모달 열림');
 
   // 2. 공개 라디오 선택
   await page.click('#open20');
-  console.log('  공개 설정 완료');
+  logger.log('공개 설정 완료');
 
   if (publishMode.mode === 'now') {
     await page.click('button.btn_date:has-text("현재")');
     await page.waitForTimeout(300);
     await page.click('#publish-btn');
-    console.log('✓ 공개 발행 완료');
+    logger.log('공개 발행 완료');
   } else {
     const { datetime } = publishMode;
     const targetYear = datetime.getFullYear();
@@ -275,7 +273,7 @@ export async function handlePublishModal(
     // 캘린더 열기
     await page.click('button.btn_reserve');
     await page.waitForSelector('.box_calendar', { timeout: 5_000 });
-    console.log('  캘린더 열림');
+    logger.log('캘린더 열림');
 
     // 목표 월 이동
     await navigateCalendarTo(page, targetYear, targetMonth);
@@ -294,15 +292,15 @@ export async function handlePublishModal(
     if (!clicked) {
       throw new Error(`캘린더에서 ${targetDay}일을 클릭할 수 없습니다.`);
     }
-    console.log(`  날짜 선택: ${targetYear}-${targetMonth}-${targetDay}`);
+    logger.log(`날짜 선택: ${targetYear}-${targetMonth}-${targetDay}`);
 
     // 시간/분 입력
     await page.fill('#dateHour', String(targetHour));
     await page.fill('#dateMinute', String(targetMinute));
-    console.log(`  시간 설정: ${targetHour}:${String(targetMinute).padStart(2, '0')}`);
+    logger.log(`시간 설정: ${targetHour}:${String(targetMinute).padStart(2, '0')}`);
 
     await page.click('#publish-btn');
-    console.log(`✓ 예약 발행 완료: ${datetime.toLocaleString('ko-KR')}`);
+    logger.log(`예약 발행 완료: ${datetime.toLocaleString('ko-KR')}`);
   }
 }
 
@@ -315,10 +313,10 @@ export async function createContextFromSession(
 ): Promise<BrowserContext> {
   const session = await sessionProvider.getSession();
   if (session) {
-    console.log('✓ 저장된 세션을 불러옵니다.');
+    logger.log('저장된 세션을 불러옵니다.');
     return browser.newContext({ storageState: session as any });
   }
-  console.log('저장된 세션이 없습니다. 로그인이 필요합니다.');
+  logger.log('저장된 세션이 없습니다. 로그인이 필요합니다.');
   return browser.newContext();
 }
 
@@ -376,7 +374,7 @@ export async function runTistoryPublish(opts: {
 
   try {
     // 1. 로그인 확인
-    console.log('티스토리 관리 페이지로 이동...');
+    logger.log('티스토리 관리 페이지로 이동');
     await page.goto(`https://${BLOG_NAME}.tistory.com/manage`, {
       waitUntil: 'domcontentloaded',
     });
@@ -391,14 +389,14 @@ export async function runTistoryPublish(opts: {
       // 기존 세션이 있었는데 실패한 경우 Redis에서 삭제
       const existing = await sessionProvider.getSession();
       if (existing) {
-        console.log('⚠️  저장된 세션이 만료되었습니다. 세션을 삭제합니다.');
+        logger.warn('저장된 세션이 만료되었습니다. 세션을 삭제합니다.');
         await sessionProvider.deleteSession();
       }
 
-      console.log('\n⚠️  로그인이 필요합니다. 카카오 자동 로그인 시작...');
+      logger.warn('로그인이 필요합니다. 카카오 자동 로그인 시작');
       await kakaoLogin(page, kakaoId, kakaoPassword);
     } else {
-      console.log('✓ 로그인 상태 확인');
+      logger.log('로그인 상태 확인');
     }
 
     // 세션 저장
@@ -406,28 +404,28 @@ export async function runTistoryPublish(opts: {
     await sessionProvider.saveSession(state);
 
     // 2. 글쓰기 페이지 이동
-    console.log('글쓰기 페이지로 이동...');
+    logger.log('글쓰기 페이지로 이동');
     await page.goto(`https://${BLOG_NAME}.tistory.com/manage/newpost`, {
       waitUntil: 'networkidle',
     });
 
     // 3. 카테고리 선택
-    console.log('카테고리 선택...');
+    logger.log('카테고리 선택');
     await selectCategory(page, draft.category);
 
     // 4. 제목 입력
-    console.log('제목 입력:', draft.title);
+    logger.log(`제목 입력: ${draft.title}`);
     await page.waitForSelector('#post-title-inp', { timeout: 10_000 });
     await page.click('#post-title-inp');
     await page.fill('#post-title-inp', draft.title);
 
     // 5. HTML 본문 입력
-    console.log('HTML 본문 입력...');
+    logger.log('HTML 본문 입력');
     await fillHtmlViaModal(page, htmlContent);
 
     // 6. 해시태그 입력
     if (draft.hashtags && draft.hashtags.length > 0) {
-      console.log('해시태그 입력...');
+      logger.log('해시태그 입력');
       await fillHashtags(page, draft.hashtags);
     }
 
@@ -445,15 +443,15 @@ export async function runTistoryPublish(opts: {
       { timeout: 30_000 },
     );
 
-    console.log('발행 중...');
+    logger.log('발행 중');
     await handlePublishModal(page, publishMode);
 
     // 9. permalink 추출
     const permalink = await extractPermalinkFromPostsResponse(postsJsonResponsePromise);
     if (permalink) {
-      console.log(`✓ 발행 완료! permalink: ${permalink}`);
+      logger.log(`발행 완료 - permalink: ${permalink}`);
     } else {
-      console.log('✓ 발행 완료! (permalink 추출 실패)');
+      logger.log('발행 완료 (permalink 추출 실패)');
     }
 
     await page.waitForTimeout(3_000);
