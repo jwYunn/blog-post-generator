@@ -9,15 +9,15 @@ export interface TistoryDraftData {
   category: string;
 }
 
-/** 세션 관리 인터페이스 – NestJS 서비스와 스크립트 직접 구현 양쪽에서 사용 */
+/** Session management interface – used by both the NestJS service and standalone scripts */
 export interface TistorySessionProvider {
   getSession(): Promise<object | null>;
   saveSession(state: object): Promise<void>;
   deleteSession(): Promise<void>;
 }
 
-/** runTistoryPublish 반환 결과 */
+/** Return type of runTistoryPublish */
 export interface TistoryPublishResult {
-  /** 발행된 글의 permalink. 추출 실패 시 null */
+  /** Permalink of the published post. null if extraction failed */
   permalink: string | null;
 }

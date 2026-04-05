@@ -159,7 +159,7 @@ export class TopicCandidateService {
   private async approveCandidate(id: string): Promise<ApproveResult> {
     const { draft, articleDraftCreated } =
       await this.candidateRepository.manager.transaction(async (manager) => {
-        // 1. candidate 조회 및 상태 검증
+        // 1. Fetch candidate and validate status
         const candidate = await manager.findOne(TopicCandidateEntity, {
           where: { id },
           relations: ['topicSeed'],
@@ -173,12 +173,12 @@ export class TopicCandidateService {
           );
         }
 
-        // 2. 대상 candidate approved
+        // 2. Approve target candidate
         await manager.update(TopicCandidateEntity, { id }, {
           status: TopicCandidateStatus.APPROVED,
         });
 
-        // 3. 같은 seed의 다른 pending candidate 전부 rejected
+        // 3. Reject all other pending candidates for the same seed
         await manager
           .createQueryBuilder()
           .update(TopicCandidateEntity)
@@ -188,7 +188,7 @@ export class TopicCandidateService {
           .andWhere('status = :status', { status: TopicCandidateStatus.PENDING })
           .execute();
 
-        // 4. article_draft find-or-create
+        // 4. Find or create article draft
         const existingDraft = await manager.findOne(ArticleDraftEntity, {
           where: { topicCandidateId: id },
         });
@@ -213,7 +213,7 @@ export class TopicCandidateService {
         return { draft, articleDraftCreated };
       });
 
-    // 5. 트랜잭션 커밋 이후 enqueue
+    // 5. Enqueue after transaction commit
     await this.articleOutlineQueue.add(GENERATE_ARTICLE_OUTLINE_JOB, {
       articleDraftId: draft.id,
     });

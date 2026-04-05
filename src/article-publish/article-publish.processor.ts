@@ -49,7 +49,7 @@ export class ArticlePublishProcessor extends WorkerHost {
       const kakaoId = process.env.KAKAO_ID;
       const kakaoPassword = process.env.KAKAO_PASSWORD;
       if (!kakaoId || !kakaoPassword) {
-        throw new Error('KAKAO_ID 또는 KAKAO_PASSWORD 환경변수가 설정되지 않았습니다.');
+        throw new Error('KAKAO_ID or KAKAO_PASSWORD environment variable is not set.');
       }
 
       const publishMode: PublishMode =

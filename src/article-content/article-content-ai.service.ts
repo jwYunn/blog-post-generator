@@ -125,7 +125,7 @@ Example format: ["#영어공부", "#EnglishGrammar", "#영어표현", "#LearnEng
       .map((c: any) => c.text)
       .join('');
 
-    // JSON 배열 파싱
+    // Parse JSON array
     const match = raw.match(/\[[\s\S]*\]/);
     if (!match) {
       throw new Error('Failed to parse hashtags response');

@@ -43,19 +43,19 @@ export class ArticleThumbnailProcessor extends WorkerHost {
     await this.draftRepository.save(draft);
 
     try {
-      // 1. 템플릿에 텍스트 합성
+      // 1. Composite title text onto template image
       const fileBuffer =
         await this.imageProcessingService.processThumbnailWithText(
           stripTitleCategory(draft.title),
         );
 
-      // 2. S3 업로드
+      // 2. Upload to S3
       const uploadedUrl = await this.s3UploadService.uploadThumbnail(
         articleDraftId,
         fileBuffer,
       );
 
-      // 3. 결과 저장
+      // 3. Save result
       draft.thumbnailImageUrl = uploadedUrl;
       draft.status = ArticleDraftStatus.REVIEW_READY;
       draft.errorMessage = null;

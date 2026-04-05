@@ -165,12 +165,12 @@ export class TopicSeedService {
     };
   }
 
-  // BullMQ Job 전용: 활성화된 seed 목록 반환
+  // Used by BullMQ jobs: returns all active seeds
   async findActiveSeeds(): Promise<TopicSeedEntity[]> {
     return this.topicSeedRepository.find({ where: { isActive: true } });
   }
 
-  // BullMQ Job 전용: 사용 횟수 증가 및 마지막 사용 시각 갱신
+  // Used by BullMQ jobs: increments usage count and updates last used timestamp
   async incrementUsedCount(id: string): Promise<void> {
     await this.topicSeedRepository
       .createQueryBuilder()

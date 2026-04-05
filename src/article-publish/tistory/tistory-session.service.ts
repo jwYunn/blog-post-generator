@@ -4,7 +4,7 @@ import Redis from 'ioredis';
 import { TistorySessionProvider } from './tistory.types';
 
 const TISTORY_SESSION_KEY = 'tistory:session';
-const SESSION_TTL_SECONDS = 86_400; // 24시간
+const SESSION_TTL_SECONDS = 86_400; // 24 hours
 
 @Injectable()
 export class TistorySessionService implements TistorySessionProvider, OnModuleDestroy {
