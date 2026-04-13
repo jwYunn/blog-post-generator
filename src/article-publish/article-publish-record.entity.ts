@@ -31,7 +31,7 @@ export class ArticlePublishRecordEntity {
   @Column({ type: 'jsonb', nullable: true })
   schedule: PublishSchedule | null;
 
-  /** 확장용 메타데이터 */
+  /** Extensible metadata */
   @Column({ type: 'jsonb', nullable: true })
   meta: Record<string, unknown> | null;
 

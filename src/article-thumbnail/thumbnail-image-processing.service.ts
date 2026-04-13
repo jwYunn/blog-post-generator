@@ -41,13 +41,13 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
   private templateBuffers: Map<string, Buffer> = new Map();
 
   async onModuleInit(): Promise<void> {
-    // 폰트 다운로드 → base64 인코딩 (1회)
+    // Download font and encode to base64 (runs once on module init)
     const fontRes = await axios.get<ArrayBuffer>(FONT_URL, {
       responseType: 'arraybuffer',
     });
     this.fontBase64 = Buffer.from(fontRes.data).toString('base64');
 
-    // 템플릿 이미지 다운로드 → 메모리 캐시 (1회)
+    // Download template images and cache in memory (runs once on module init)
     await Promise.all(
       TEMPLATES.map(async (tpl) => {
         const res = await axios.get<ArrayBuffer>(
@@ -60,22 +60,22 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
   }
 
   async processThumbnailWithText(title: string): Promise<Buffer> {
-    // 랜덤 템플릿 선택
+    // Pick a random template
     const tpl = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)];
     const templateBuffer = this.templateBuffers.get(tpl.filename)!;
 
-    // 텍스트 줄 계산
+    // Calculate text line layout
     const { lines, fontSize } = this.calculateTextLayout(title, tpl.textZone);
 
-    // SVG 생성
+    // Build SVG overlay
     const svgBuffer = this.buildSvgOverlay(lines, fontSize, tpl.textZone);
 
-    // 1단계: SVG 텍스트 합성 (1152x896 원본 크기 유지)
+    // Step 1: composite SVG text onto template (keep original 1152x896 size)
     const composited = await sharp(templateBuffer)
       .composite([{ input: svgBuffer, blend: 'over' }])
       .toBuffer();
 
-    // 2단계: 400x300 리사이즈 → webp
+    // Step 2: resize to 400x300 and convert to webp
     const outputBuffer = await sharp(composited)
       .resize(400, 300, { fit: 'cover' })
       .webp({ quality: 85 })
@@ -84,7 +84,7 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     return outputBuffer;
   }
 
-  // ─── 텍스트 줄바꿈 계산 ───────────────────────────────────────────────
+  // ─── Text wrap calculation ────────────────────────────────────────────
 
   private calculateTextLayout(
     text: string,
@@ -103,7 +103,7 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
       }
     }
 
-    // 최소 폰트로도 안 맞으면 강제로 잘라서 반환
+    // Fallback: force-truncate to 4 lines at minimum font size
     const fallback = this.wrapText(text, zone.maxWidth - 80, 40);
     return { lines: fallback.slice(0, 4), fontSize: 40 };
   }
@@ -135,7 +135,7 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     return lines;
   }
 
-  // 공백 포함 토큰화: 영문은 단어 단위, 한글은 어절 단위
+  // Tokenize preserving spaces: English by word, Korean by eojeol (space-delimited chunk)
   private tokenize(text: string): string[] {
     const tokens: string[] = [];
     let current = '';
@@ -159,7 +159,7 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     return tokens;
   }
 
-  // 폭 추정: 한글 1자 ≈ fontSize * 1.0, 영문 1자 ≈ fontSize * 0.65, 공백 ≈ fontSize * 0.35
+  // Width estimate: Korean char ≈ fontSize * 1.0, English char ≈ fontSize * 0.65, space ≈ fontSize * 0.35
   private estimateWidth(token: string, fontSize: number): number {
     let width = 0;
     for (const ch of token) {
@@ -174,7 +174,7 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     return width;
   }
 
-  // ─── SVG 오버레이 생성 ────────────────────────────────────────────────
+  // ─── SVG overlay builder ──────────────────────────────────────────────
 
   private buildSvgOverlay(
     lines: string[],

@@ -34,7 +34,7 @@ export class ThumbnailGeneratorProcessor extends WorkerHost {
       for (let i = 0; i < outputs.length; i++) {
         const { buffer, mimeType } = outputs[i];
 
-        // UUID를 임시로 생성해 S3 key에 사용 (썸네일 저장 전)
+        // Generate a temp UUID for the S3 key before the thumbnail entity is saved
         const tempId = crypto.randomUUID();
         const s3Url = await this.s3Service.upload(tempId, buffer, mimeType);
 

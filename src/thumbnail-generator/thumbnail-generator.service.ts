@@ -30,7 +30,7 @@ export class ThumbnailGeneratorService {
     private readonly queue: Queue,
   ) {}
 
-  /** 프롬프트 저장 + 큐 등록 */
+  /** Save prompt entity and enqueue generation job */
   async generate(dto: GenerateThumbnailDto): Promise<ThumbnailPromptEntity> {
     const prompt = this.promptRepo.create({
       name: dto.name ?? null,
@@ -55,7 +55,7 @@ export class ThumbnailGeneratorService {
     return saved;
   }
 
-  /** 프롬프트 목록 */
+  /** List all prompts (paginated) */
   async findAll(query: QueryThumbnailPromptsDto) {
     const { page = 1, limit = 20 } = query;
     const [data, total] = await this.promptRepo.findAndCount({
@@ -66,16 +66,16 @@ export class ThumbnailGeneratorService {
     return { data, total, page, limit };
   }
 
-  /** 프롬프트 상세 (status 포함 — FE 폴링용) */
+  /** Get prompt detail including status (used for FE polling) */
   async findOne(id: string): Promise<ThumbnailPromptEntity> {
     const prompt = await this.promptRepo.findOne({ where: { id } });
     if (!prompt) throw new NotFoundException(`ThumbnailPrompt #${id} not found`);
     return prompt;
   }
 
-  /** 프롬프트에 연결된 이미지 목록 */
+  /** Get all images linked to a prompt */
   async findImages(promptId: string) {
-    await this.findOne(promptId); // 존재 확인
+    await this.findOne(promptId); // throws NotFoundException if not found
     return this.mappingRepo.find({
       where: { promptId },
       relations: ['thumbnail'],
@@ -83,7 +83,7 @@ export class ThumbnailGeneratorService {
     });
   }
 
-  /** active 플래그 토글 */
+  /** Toggle active flag on a mapping */
   async setActive(mappingId: string, active: boolean) {
     const mapping = await this.mappingRepo.findOne({ where: { id: mappingId } });
     if (!mapping) throw new NotFoundException(`Mapping #${mappingId} not found`);
@@ -91,13 +91,13 @@ export class ThumbnailGeneratorService {
     return this.mappingRepo.save(mapping);
   }
 
-  /** 프롬프트 삭제 (CASCADE로 mapping도 삭제) */
+  /** Delete a prompt (CASCADE removes linked mappings) */
   async remove(id: string): Promise<void> {
     const prompt = await this.findOne(id);
     await this.promptRepo.remove(prompt);
   }
 
-  // ─── Processor에서 사용 ───────────────────────────────────────────────────
+  // ─── Used by processor ────────────────────────────────────────────────────
 
   async saveThumbnailAndMapping(
     promptId: string,

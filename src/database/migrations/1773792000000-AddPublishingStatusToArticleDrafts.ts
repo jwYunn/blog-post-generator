@@ -13,7 +13,7 @@ export class AddPublishingStatusToArticleDrafts1773792000000 implements Migratio
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // PostgreSQL enum 값 제거는 직접 지원되지 않으므로 타입 재생성 방식 사용
+    // PostgreSQL does not support removing enum values directly; recreate the type instead
     await queryRunner.query(`
       ALTER TABLE "article_drafts"
         ALTER COLUMN "status" TYPE VARCHAR(50)

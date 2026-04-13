@@ -20,7 +20,7 @@ import { UpdatePublishRecordDto } from './dto/update-publish-record.dto';
 export class ArticlePublishRecordController {
   constructor(private readonly recordService: ArticlePublishRecordService) {}
 
-  // ─── 조회 ──────────────────────────────────────────────────────────────────
+  // ─── Read ───────────────────────────────────────────────────────────────────
 
   @Get('article-publish-records')
   findAll(@Query() dto: QueryPublishRecordListDto) {
@@ -40,7 +40,7 @@ export class ArticlePublishRecordController {
     return this.recordService.findByDraftId(draftId, dto);
   }
 
-  // ─── 수정 ──────────────────────────────────────────────────────────────────
+  // ─── Write ──────────────────────────────────────────────────────────────────
 
   @Post('article-publish-records')
   create(@Body() dto: CreatePublishRecordDto) {

@@ -19,31 +19,31 @@ import { QueryThumbnailPromptsDto } from './dto/query-thumbnail-prompts.dto';
 export class ThumbnailGeneratorController {
   constructor(private readonly service: ThumbnailGeneratorService) {}
 
-  /** 프롬프트 저장 + 생성 job 등록 */
+  /** Save prompt and enqueue generation job */
   @Post('generate')
   generate(@Body() dto: GenerateThumbnailDto) {
     return this.service.generate(dto);
   }
 
-  /** 프롬프트 목록 */
+  /** List all prompts */
   @Get('prompts')
   findAll(@Query() query: QueryThumbnailPromptsDto) {
     return this.service.findAll(query);
   }
 
-  /** 프롬프트 상세 + status (FE 폴링용) */
+  /** Get prompt detail with status (used for FE polling) */
   @Get('prompts/:id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findOne(id);
   }
 
-  /** 프롬프트에 연결된 이미지 목록 */
+  /** Get generated images for a prompt */
   @Get('prompts/:id/images')
   findImages(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.findImages(id);
   }
 
-  /** active 플래그 토글 */
+  /** Toggle active flag on a mapping */
   @Patch('mappings/:id/active')
   setActive(
     @Param('id', ParseUUIDPipe) id: string,
@@ -52,7 +52,7 @@ export class ThumbnailGeneratorController {
     return this.service.setActive(id, active);
   }
 
-  /** 프롬프트 삭제 */
+  /** Delete a prompt */
   @Delete('prompts/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id', ParseUUIDPipe) id: string) {

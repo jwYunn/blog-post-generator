@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type ReplicateType from 'replicate';
 import type { ThumbnailPromptMeta } from './entities/thumbnail-prompt.entity';
 
-// module.exports = Replicate (클래스 직접 export) 이므로 require로 받아야 함
+// replicate package uses module.exports = Replicate (direct class export), so use require() instead of ES default import
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const ReplicateSDK = require('replicate') as typeof ReplicateType;
 
