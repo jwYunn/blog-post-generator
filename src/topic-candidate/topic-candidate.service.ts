@@ -167,9 +167,12 @@ export class TopicCandidateService {
         if (!candidate) {
           throw new NotFoundException(`TopicCandidate #${id} not found`);
         }
-        if (candidate.status !== TopicCandidateStatus.PENDING) {
+        if (
+          candidate.status !== TopicCandidateStatus.PENDING &&
+          candidate.status !== TopicCandidateStatus.REJECTED
+        ) {
           throw new ConflictException(
-            `TopicCandidate #${id} is not pending (current: ${candidate.status})`,
+            `TopicCandidate #${id} cannot be approved (current: ${candidate.status})`,
           );
         }
 
@@ -178,17 +181,7 @@ export class TopicCandidateService {
           status: TopicCandidateStatus.APPROVED,
         });
 
-        // 3. Reject all other pending candidates for the same seed
-        await manager
-          .createQueryBuilder()
-          .update(TopicCandidateEntity)
-          .set({ status: TopicCandidateStatus.REJECTED })
-          .where('topicSeedId = :topicSeedId', { topicSeedId: candidate.topicSeedId })
-          .andWhere('id != :id', { id })
-          .andWhere('status = :status', { status: TopicCandidateStatus.PENDING })
-          .execute();
-
-        // 4. Find or create article draft
+        // 3. Find or create article draft
         const existingDraft = await manager.findOne(ArticleDraftEntity, {
           where: { topicCandidateId: id },
         });
@@ -230,6 +223,11 @@ export class TopicCandidateService {
     const candidate = await this.candidateRepository.findOne({ where: { id } });
     if (!candidate) {
       throw new NotFoundException(`TopicCandidate #${id} not found`);
+    }
+    if (candidate.status === TopicCandidateStatus.APPROVED) {
+      throw new ConflictException(
+        `Approved candidate cannot be rejected`,
+      );
     }
 
     candidate.status = TopicCandidateStatus.REJECTED;
