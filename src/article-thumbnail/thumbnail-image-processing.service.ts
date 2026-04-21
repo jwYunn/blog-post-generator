@@ -22,10 +22,6 @@ const FONT_URL =
 
 const TEMPLATES: TemplateConfig[] = [
   {
-    filename: 'blog_template_2.webp',
-    textZone: { centerX: 576, startY: 108, endY: 410, maxWidth: 852 },
-  },
-  {
     filename: 'blog_template_3.webp',
     textZone: { centerX: 576, startY: 94, endY: 490, maxWidth: 896 },
   },
