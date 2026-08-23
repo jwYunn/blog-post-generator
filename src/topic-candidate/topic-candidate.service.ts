@@ -69,7 +69,10 @@ export class TopicCandidateService {
     private readonly articleOutlineQueue: Queue,
   ) {}
 
-  async saveMany(seedId: string, candidates: CandidatePayload[]): Promise<void> {
+  async saveMany(
+    seedId: string,
+    candidates: CandidatePayload[],
+  ): Promise<void> {
     const existing = await this.candidateRepository.find({
       where: { topicSeedId: seedId },
       select: ['keyword', 'title'],
@@ -177,9 +180,13 @@ export class TopicCandidateService {
         }
 
         // 2. Approve target candidate
-        await manager.update(TopicCandidateEntity, { id }, {
-          status: TopicCandidateStatus.APPROVED,
-        });
+        await manager.update(
+          TopicCandidateEntity,
+          { id },
+          {
+            status: TopicCandidateStatus.APPROVED,
+          },
+        );
 
         // 3. Find or create article draft
         const existingDraft = await manager.findOne(ArticleDraftEntity, {
@@ -195,7 +202,10 @@ export class TopicCandidateService {
         } else {
           const newDraft = manager.create(ArticleDraftEntity, {
             topicCandidateId: id,
-            title: formatTitleWithCategory(candidate.topicSeed.category, candidate.title),
+            title: formatTitleWithCategory(
+              candidate.topicSeed.category,
+              candidate.title,
+            ),
             keyword: candidate.keyword,
             status: ArticleDraftStatus.QUEUED,
           });
@@ -225,9 +235,7 @@ export class TopicCandidateService {
       throw new NotFoundException(`TopicCandidate #${id} not found`);
     }
     if (candidate.status === TopicCandidateStatus.APPROVED) {
-      throw new ConflictException(
-        `Approved candidate cannot be rejected`,
-      );
+      throw new ConflictException(`Approved candidate cannot be rejected`);
     }
 
     candidate.status = TopicCandidateStatus.REJECTED;

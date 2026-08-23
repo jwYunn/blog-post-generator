@@ -1,4 +1,6 @@
-export type PublishMode = { mode: 'now' } | { mode: 'schedule'; datetime: Date };
+export type PublishMode =
+  | { mode: 'now' }
+  | { mode: 'schedule'; datetime: Date };
 
 export interface TistoryDraftData {
   title: string;

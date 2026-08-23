@@ -38,9 +38,13 @@ export class ThumbnailGeneratorAiService {
       num_outputs: numOutputs,
     };
 
-    this.logger.log(`Calling Replicate model: ${model}, outputs: ${numOutputs}`);
+    this.logger.log(
+      `Calling Replicate model: ${model}, outputs: ${numOutputs}`,
+    );
 
-    const output = await this.replicate.run(model as `${string}/${string}`, { input });
+    const output = await this.replicate.run(model as `${string}/${string}`, {
+      input,
+    });
 
     const items = Array.isArray(output) ? output : [output];
     const results: ReplicateOutput[] = [];
@@ -55,12 +59,16 @@ export class ThumbnailGeneratorAiService {
       this.logger.log(`Downloading Replicate output: ${url}`);
       const response = await fetch(url);
       if (!response.ok) {
-        throw new Error(`Failed to download image from Replicate: ${response.statusText}`);
+        throw new Error(
+          `Failed to download image from Replicate: ${response.statusText}`,
+        );
       }
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
-      const mimeType = response.headers.get('content-type') ?? `image/${meta?.output_format ?? 'webp'}`;
+      const mimeType =
+        response.headers.get('content-type') ??
+        `image/${meta?.output_format ?? 'webp'}`;
 
       results.push({ buffer, mimeType });
     }

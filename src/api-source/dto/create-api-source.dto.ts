@@ -1,4 +1,10 @@
-import { IsObject, IsOptional, IsString, IsUrl, MaxLength } from 'class-validator';
+import {
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateApiSourceDto {
   @IsString()

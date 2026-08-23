@@ -13,7 +13,10 @@ import { TopicCandidateModule } from '../topic-candidate/topic-candidate.module'
   imports: [
     ConfigModule,
     BullModule.registerQueue({ name: TOPIC_GENERATE_QUEUE }),
-    BullBoardModule.forFeature({ name: TOPIC_GENERATE_QUEUE, adapter: BullMQAdapter }),
+    BullBoardModule.forFeature({
+      name: TOPIC_GENERATE_QUEUE,
+      adapter: BullMQAdapter,
+    }),
     TopicSeedModule,
     TopicCandidateModule,
   ],

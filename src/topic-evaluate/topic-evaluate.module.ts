@@ -18,7 +18,10 @@ import { TopicCandidateModule } from '../topic-candidate/topic-candidate.module'
         removeOnFail: { age: 604_800 },
       },
     }),
-    BullBoardModule.forFeature({ name: TOPIC_EVALUATE_QUEUE, adapter: BullMQAdapter }),
+    BullBoardModule.forFeature({
+      name: TOPIC_EVALUATE_QUEUE,
+      adapter: BullMQAdapter,
+    }),
     TopicCandidateModule,
   ],
   providers: [TopicEvaluateProcessor, TopicEvaluateAiService],

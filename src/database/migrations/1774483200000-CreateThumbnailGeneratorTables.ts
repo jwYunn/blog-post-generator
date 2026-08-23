@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CreateThumbnailGeneratorTables1774483200000
-  implements MigrationInterface
-{
+export class CreateThumbnailGeneratorTables1774483200000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // thumbnail_prompts
     await queryRunner.query(`
@@ -60,6 +58,8 @@ export class CreateThumbnailGeneratorTables1774483200000
     await queryRunner.query(`DROP TABLE IF EXISTS "thumbnail_prompt_mappings"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "thumbnails"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "thumbnail_prompts"`);
-    await queryRunner.query(`DROP TYPE IF EXISTS "thumbnail_prompt_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE IF EXISTS "thumbnail_prompt_status_enum"`,
+    );
   }
 }

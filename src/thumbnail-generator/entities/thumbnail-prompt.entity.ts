@@ -29,7 +29,11 @@ export class ThumbnailPromptEntity {
   @Column({ type: 'text' })
   prompt: string;
 
-  @Column({ type: 'varchar', length: 100, default: 'black-forest-labs/flux-schnell' })
+  @Column({
+    type: 'varchar',
+    length: 100,
+    default: 'black-forest-labs/flux-schnell',
+  })
   model: string;
 
   @Column({ type: 'jsonb', nullable: true })

@@ -26,7 +26,9 @@ export class ThumbnailPromptMappingEntity {
   @Column({ type: 'boolean', default: false })
   active: boolean;
 
-  @ManyToOne(() => ThumbnailPromptEntity, (p) => p.mappings, { onDelete: 'CASCADE' })
+  @ManyToOne(() => ThumbnailPromptEntity, (p) => p.mappings, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'promptId' })
   prompt: ThumbnailPromptEntity;
 

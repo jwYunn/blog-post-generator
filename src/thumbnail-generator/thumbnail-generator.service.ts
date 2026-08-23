@@ -47,10 +47,9 @@ export class ThumbnailGeneratorService {
 
     const saved = await this.promptRepo.save(prompt);
 
-    await this.queue.add(
-      GENERATE_THUMBNAIL_JOB,
-      { promptId: saved.id } satisfies GenerateThumbnailJobPayload,
-    );
+    await this.queue.add(GENERATE_THUMBNAIL_JOB, {
+      promptId: saved.id,
+    } satisfies GenerateThumbnailJobPayload);
 
     return saved;
   }
@@ -69,7 +68,8 @@ export class ThumbnailGeneratorService {
   /** Get prompt detail including status (used for FE polling) */
   async findOne(id: string): Promise<ThumbnailPromptEntity> {
     const prompt = await this.promptRepo.findOne({ where: { id } });
-    if (!prompt) throw new NotFoundException(`ThumbnailPrompt #${id} not found`);
+    if (!prompt)
+      throw new NotFoundException(`ThumbnailPrompt #${id} not found`);
     return prompt;
   }
 
@@ -85,8 +85,11 @@ export class ThumbnailGeneratorService {
 
   /** Toggle active flag on a mapping */
   async setActive(mappingId: string, active: boolean) {
-    const mapping = await this.mappingRepo.findOne({ where: { id: mappingId } });
-    if (!mapping) throw new NotFoundException(`Mapping #${mappingId} not found`);
+    const mapping = await this.mappingRepo.findOne({
+      where: { id: mappingId },
+    });
+    if (!mapping)
+      throw new NotFoundException(`Mapping #${mappingId} not found`);
     mapping.active = active;
     return this.mappingRepo.save(mapping);
   }

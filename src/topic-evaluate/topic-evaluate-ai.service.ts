@@ -66,10 +66,15 @@ export class TopicEvaluateAiService {
 
     let items: RawEvaluationItem[];
     try {
-      const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      const clean = text
+        .replace(/^```(?:json)?\n?/, '')
+        .replace(/\n?```$/, '')
+        .trim();
       items = JSON.parse(clean) as RawEvaluationItem[];
     } catch {
-      this.logger.error('Failed to parse GPT evaluation response. Raw response:');
+      this.logger.error(
+        'Failed to parse GPT evaluation response. Raw response:',
+      );
       this.logger.error(text);
       throw new Error('Invalid JSON response from GPT evaluation');
     }

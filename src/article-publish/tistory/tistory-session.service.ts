@@ -7,7 +7,9 @@ const TISTORY_SESSION_KEY = 'tistory:session';
 const SESSION_TTL_SECONDS = 86_400; // 24 hours
 
 @Injectable()
-export class TistorySessionService implements TistorySessionProvider, OnModuleDestroy {
+export class TistorySessionService
+  implements TistorySessionProvider, OnModuleDestroy
+{
   private readonly redis: Redis;
 
   constructor(private readonly configService: ConfigService) {

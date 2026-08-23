@@ -46,10 +46,9 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
     // Download template images and cache in memory (runs once on module init)
     await Promise.all(
       TEMPLATES.map(async (tpl) => {
-        const res = await axios.get<ArrayBuffer>(
-          `${S3_BASE}/${tpl.filename}`,
-          { responseType: 'arraybuffer' },
-        );
+        const res = await axios.get<ArrayBuffer>(`${S3_BASE}/${tpl.filename}`, {
+          responseType: 'arraybuffer',
+        });
         this.templateBuffers.set(tpl.filename, Buffer.from(res.data));
       }),
     );

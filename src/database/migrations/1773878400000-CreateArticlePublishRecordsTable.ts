@@ -30,7 +30,9 @@ export class CreateArticlePublishRecordsTable1773878400000 implements MigrationI
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "IDX_article_publish_records_createdAt"`);
+    await queryRunner.query(
+      `DROP INDEX "IDX_article_publish_records_createdAt"`,
+    );
     await queryRunner.query(`DROP INDEX "IDX_article_publish_records_draftId"`);
     await queryRunner.query(`DROP TABLE "article_publish_records"`);
   }

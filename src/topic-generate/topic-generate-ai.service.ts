@@ -41,7 +41,10 @@ export class TopicGenerateAiService {
     let items: AiCandidateItem[];
     try {
       // Strip markdown code fences if present
-      const clean = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim();
+      const clean = text
+        .replace(/^```(?:json)?\n?/, '')
+        .replace(/\n?```$/, '')
+        .trim();
       items = JSON.parse(clean) as AiCandidateItem[];
     } catch {
       this.logger.error('Failed to parse Claude response. Raw response:');
@@ -56,7 +59,9 @@ export class TopicGenerateAiService {
       searchIntent: item.search_intent ?? null,
       targetReader: item.target_reader ?? null,
       whyThisTopic: item.why_this_topic ?? null,
-      outlinePreview: Array.isArray(item.outline_preview) ? item.outline_preview : null,
+      outlinePreview: Array.isArray(item.outline_preview)
+        ? item.outline_preview
+        : null,
     }));
   }
 }

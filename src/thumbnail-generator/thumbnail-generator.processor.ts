@@ -1,7 +1,10 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { ThumbnailGeneratorService, GenerateThumbnailJobPayload } from './thumbnail-generator.service';
+import {
+  ThumbnailGeneratorService,
+  GenerateThumbnailJobPayload,
+} from './thumbnail-generator.service';
 import { ThumbnailGeneratorAiService } from './thumbnail-generator-ai.service';
 import { ThumbnailGeneratorS3Service } from './thumbnail-generator-s3.service';
 import { THUMBNAIL_GENERATOR_QUEUE } from './thumbnail-generator.constants';
@@ -52,7 +55,10 @@ export class ThumbnailGeneratorProcessor extends WorkerHost {
       this.logger.log(`Thumbnail job done for prompt #${promptId}`);
     } catch (error) {
       this.logger.error(`Thumbnail job failed for prompt #${promptId}`, error);
-      await this.thumbnailGeneratorService.updatePromptStatus(promptId, 'failed');
+      await this.thumbnailGeneratorService.updatePromptStatus(
+        promptId,
+        'failed',
+      );
       throw error;
     }
   }

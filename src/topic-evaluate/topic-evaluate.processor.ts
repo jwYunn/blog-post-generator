@@ -3,7 +3,10 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { TopicCandidateService } from '../topic-candidate/topic-candidate.service';
 import { TopicEvaluateAiService } from './topic-evaluate-ai.service';
-import { TOPIC_EVALUATE_QUEUE, EVALUATE_TOPIC_CANDIDATES_JOB } from './topic-evaluate.constants';
+import {
+  TOPIC_EVALUATE_QUEUE,
+  EVALUATE_TOPIC_CANDIDATES_JOB,
+} from './topic-evaluate.constants';
 
 interface EvaluateJobPayload {
   seedId: string;
@@ -29,7 +32,9 @@ export class TopicEvaluateProcessor extends WorkerHost {
 
     const candidates = await this.topicCandidateService.findBySeedId(seedId);
     if (candidates.length === 0) {
-      this.logger.warn(`No candidates found for seedId: ${seedId}, skipping evaluation`);
+      this.logger.warn(
+        `No candidates found for seedId: ${seedId}, skipping evaluation`,
+      );
       return;
     }
 
@@ -43,10 +48,13 @@ export class TopicEvaluateProcessor extends WorkerHost {
       outline_preview: c.outlinePreview,
     }));
 
-    const evaluations = await this.topicEvaluateAiService.evaluateCandidates(candidateInputs);
+    const evaluations =
+      await this.topicEvaluateAiService.evaluateCandidates(candidateInputs);
 
     await this.topicCandidateService.saveEvaluations(evaluations);
 
-    this.logger.log(`Saved evaluations for ${evaluations.length} candidates (seedId: ${seedId})`);
+    this.logger.log(
+      `Saved evaluations for ${evaluations.length} candidates (seedId: ${seedId})`,
+    );
   }
 }

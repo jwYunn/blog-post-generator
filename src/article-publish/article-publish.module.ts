@@ -22,7 +22,10 @@ import { ARTICLE_PUBLISH_QUEUE } from './constants';
         removeOnFail: { age: 604_800 },
       },
     }),
-    BullBoardModule.forFeature({ name: ARTICLE_PUBLISH_QUEUE, adapter: BullMQAdapter }),
+    BullBoardModule.forFeature({
+      name: ARTICLE_PUBLISH_QUEUE,
+      adapter: BullMQAdapter,
+    }),
   ],
   controllers: [ArticlePublishRecordController],
   providers: [

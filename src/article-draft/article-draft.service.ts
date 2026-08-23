@@ -63,7 +63,10 @@ export class ArticleDraftService {
 
     const draft = this.draftRepository.create({
       topicCandidateId: candidateId,
-      title: formatTitleWithCategory(candidate.topicSeed.category, candidate.title),
+      title: formatTitleWithCategory(
+        candidate.topicSeed.category,
+        candidate.title,
+      ),
       keyword: candidate.keyword,
       status: ArticleDraftStatus.QUEUED,
     });
@@ -113,11 +116,16 @@ export class ArticleDraftService {
     return draft;
   }
 
-  async publish(id: string, dto: CreatePublishJobDto): Promise<{ jobId: string }> {
+  async publish(
+    id: string,
+    dto: CreatePublishJobDto,
+  ): Promise<{ jobId: string }> {
     const draft = await this.findOne(id);
 
     if (draft.status === ArticleDraftStatus.PUBLISHING) {
-      throw new ConflictException(`ArticleDraft #${id} is already being published`);
+      throw new ConflictException(
+        `ArticleDraft #${id} is already being published`,
+      );
     }
     if (draft.status === ArticleDraftStatus.PUBLISHED) {
       throw new ConflictException(`ArticleDraft #${id} is already published`);

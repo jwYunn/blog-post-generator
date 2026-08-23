@@ -19,7 +19,11 @@ export class ThumbnailGeneratorS3Service {
     this.publicBaseUrl = process.env.AWS_S3_PUBLIC_BASE_URL;
   }
 
-  async upload(thumbnailId: string, buffer: Buffer, mimeType: string): Promise<string> {
+  async upload(
+    thumbnailId: string,
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<string> {
     const ext = mimeType.split('/')[1] ?? 'webp';
     const key = `ai-thumbnails/${thumbnailId}.${ext}`;
 

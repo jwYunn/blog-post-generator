@@ -20,7 +20,10 @@ import { ARTICLE_THUMBNAIL_QUEUE } from '../article-thumbnail/article-thumbnail.
       },
     }),
     BullModule.registerQueue({ name: ARTICLE_THUMBNAIL_QUEUE }),
-    BullBoardModule.forFeature({ name: ARTICLE_CONTENT_QUEUE, adapter: BullMQAdapter }),
+    BullBoardModule.forFeature({
+      name: ARTICLE_CONTENT_QUEUE,
+      adapter: BullMQAdapter,
+    }),
   ],
   providers: [ArticleContentProcessor, ArticleContentAiService],
 })

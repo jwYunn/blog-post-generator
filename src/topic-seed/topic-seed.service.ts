@@ -11,7 +11,11 @@ import { Queue } from 'bullmq';
 import { TopicSeedEntity } from './topic-seed.entity';
 import { CreateTopicSeedDto } from './dto/create-topic-seed.dto';
 import { UpdateTopicSeedDto } from './dto/update-topic-seed.dto';
-import { ListTopicSeedQueryDto, SortByField, SortOrder } from './dto/list-topic-seed-query.dto';
+import {
+  ListTopicSeedQueryDto,
+  SortByField,
+  SortOrder,
+} from './dto/list-topic-seed-query.dto';
 import {
   TOPIC_GENERATE_QUEUE,
   GENERATE_TOPIC_CANDIDATES_JOB,
@@ -143,7 +147,9 @@ export class TopicSeedService {
       );
     }
 
-    await this.topicGenerateQueue.add(GENERATE_TOPIC_CANDIDATES_JOB, { seedId: id });
+    await this.topicGenerateQueue.add(GENERATE_TOPIC_CANDIDATES_JOB, {
+      seedId: id,
+    });
 
     return {
       message: 'Topic generation job has been queued.',

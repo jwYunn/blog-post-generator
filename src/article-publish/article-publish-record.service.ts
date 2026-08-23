@@ -66,7 +66,9 @@ export class ArticlePublishRecordService {
     return { data, total, page, limit };
   }
 
-  async create(dto: CreatePublishRecordDto): Promise<ArticlePublishRecordEntity> {
+  async create(
+    dto: CreatePublishRecordDto,
+  ): Promise<ArticlePublishRecordEntity> {
     const draft = await this.draftRepository.findOne({
       where: { id: dto.draftId },
     });

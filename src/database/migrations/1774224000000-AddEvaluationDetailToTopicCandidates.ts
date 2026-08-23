@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddEvaluationDetailToTopicCandidates1774224000000
-  implements MigrationInterface
-{
+export class AddEvaluationDetailToTopicCandidates1774224000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "topic_candidates"

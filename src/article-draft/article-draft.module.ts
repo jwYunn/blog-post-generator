@@ -20,7 +20,10 @@ import { ArticlePublishModule } from '../article-publish/article-publish.module'
         removeOnFail: { age: 604_800 },
       },
     }),
-    BullBoardModule.forFeature({ name: ARTICLE_OUTLINE_QUEUE, adapter: BullMQAdapter }),
+    BullBoardModule.forFeature({
+      name: ARTICLE_OUTLINE_QUEUE,
+      adapter: BullMQAdapter,
+    }),
     ArticlePublishModule,
   ],
   controllers: [ArticleDraftController],

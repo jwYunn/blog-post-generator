@@ -39,6 +39,8 @@ export class CreateTopicCandidatesTable1773532800000 implements MigrationInterfa
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "IDX_topic_candidates_topicSeedId"`);
     await queryRunner.query(`DROP TABLE "topic_candidates"`);
-    await queryRunner.query(`DROP TYPE "public"."topic_candidates_status_enum"`);
+    await queryRunner.query(
+      `DROP TYPE "public"."topic_candidates_status_enum"`,
+    );
   }
 }
