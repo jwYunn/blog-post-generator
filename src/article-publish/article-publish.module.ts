@@ -18,6 +18,11 @@ import { ARTICLE_PUBLISH_QUEUE } from './constants';
     BullModule.registerQueue({
       name: ARTICLE_PUBLISH_QUEUE,
       defaultJobOptions: {
+        // A failed publish must not be retried: the job may have already
+        // created the post before failing, and a retry would duplicate it.
+        // Matches BullMQ's default, stated explicitly so a global default
+        // added later cannot silently turn retries on here.
+        attempts: 1,
         removeOnComplete: { age: 604_800 },
         removeOnFail: { age: 604_800 },
       },

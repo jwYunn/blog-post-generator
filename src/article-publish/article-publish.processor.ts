@@ -13,6 +13,7 @@ import { TistorySessionService } from './tistory/tistory-session.service';
 import { runTistoryPublish } from './tistory/tistory-automation';
 import { PublishMode } from './tistory/tistory.types';
 import { ARTICLE_PUBLISH_QUEUE } from './constants';
+import { isEnabled } from '../config/env.validation';
 
 interface ArticlePublishJobPayload {
   articleDraftId: string;
@@ -20,7 +21,11 @@ interface ArticlePublishJobPayload {
   scheduledAt?: string; // ISO string
 }
 
-@Processor(ARTICLE_PUBLISH_QUEUE, { concurrency: 1 })
+// maxStalledCount 0 closes the second path back into a rerun: `attempts: 1`
+// only governs failures, while a stalled job - one whose worker died mid-publish
+// - is otherwise re-queued once by default. That job may already have posted the
+// article, so it fails outright instead and is left for a human to check.
+@Processor(ARTICLE_PUBLISH_QUEUE, { concurrency: 1, maxStalledCount: 0 })
 export class ArticlePublishProcessor extends WorkerHost {
   constructor(
     @InjectRepository(ArticleDraftEntity)
@@ -61,6 +66,13 @@ export class ArticlePublishProcessor extends WorkerHost {
       // Guaranteed present - validateEnv rejects startup without it
       const blogName =
         this.configService.getOrThrow<string>('TISTORY_BLOG_NAME');
+      // validateEnv only demands BROWSERLESS_URL when this flag is off
+      const useLocalBrowser = isEnabled(
+        this.configService.get<string>('BROWSER_DEBUG_LOCAL'),
+      );
+      const browserlessUrl = useLocalBrowser
+        ? undefined
+        : this.configService.getOrThrow<string>('BROWSERLESS_URL');
 
       const publishMode: PublishMode =
         mode === 'schedule' && scheduledAt
@@ -80,7 +92,8 @@ export class ArticlePublishProcessor extends WorkerHost {
         kakaoId,
         kakaoPassword,
         blogName,
-        headless: true,
+        browserlessUrl,
+        useLocalBrowser,
       });
 
       draft.status = ArticleDraftStatus.PUBLISHED;

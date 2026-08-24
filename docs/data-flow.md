@@ -145,7 +145,7 @@ POST /article-drafts/:id/publish  { "mode": "now" | "schedule", "scheduledAt"?: 
 
 1. Sets draft status → `publishing`
 2. Calls `runTistoryPublish()` with Playwright:
-   - Launches Chromium (headless)
+   - Connects to the remote browser at `BROWSERLESS_URL` via `chromium.connect()`
    - Navigates to Kakao login page
    - Enters credentials; waits for mobile auth approval (up to 5 minutes)
    - Navigates to Tistory blog editor

@@ -29,7 +29,7 @@ These are pure API calls (OpenAI, Anthropic). They're I/O bound with no shared s
 Sharp image processing is CPU-bound. A single concurrent worker prevents resource contention and keeps memory usage predictable.
 
 **`article-publish` — concurrency 1**
-Playwright launches a real Chromium browser session and authenticates with Kakao (mobile auth). Concurrent sessions would conflict with login state. Serializing these jobs is a correctness requirement, not a performance choice.
+Playwright drives a real Chromium session on the remote browser (browserless) and authenticates with Kakao (mobile auth). Concurrent sessions would conflict with login state. Serializing these jobs is a correctness requirement, not a performance choice.
 
 ---
 

@@ -3,7 +3,7 @@
  * Shared between the NestJS processor and standalone scripts.
  */
 import { Logger } from '@nestjs/common';
-import { Page, BrowserContext, chromium } from 'playwright-core';
+import { Browser, Page, BrowserContext, chromium } from 'playwright-core';
 import { marked } from 'marked';
 import {
   PublishMode,
@@ -14,6 +14,45 @@ import {
 import { stripTitleCategory } from '../../common/utils/title.util';
 
 const logger = new Logger('TistoryAutomation');
+
+/** Delay applied to every Playwright operation, carried over from local launch */
+const SLOW_MO_MS = 50;
+
+/**
+ * Budget for establishing the WebSocket connection to the remote browser only.
+ * How long the session may then stay open is the remote's call - browserless
+ * caps it with its own TIMEOUT setting, which has to cover a whole publish run
+ * or the browser is torn down mid-flow. Its 30s default is not enough.
+ */
+const CONNECT_TIMEOUT_MS = 30_000;
+
+// ─── Browser acquisition ────────────────────────────────────────────────────
+
+/** Attach to the remote browser that runs the publish session */
+async function connectRemoteBrowser(browserlessUrl: string): Promise<Browser> {
+  logger.log('Connecting to remote browser');
+  return chromium.connect(browserlessUrl, {
+    // Preserves the pacing the flow was tuned against when it launched a local
+    // browser; Tistory's editor is sensitive to operations landing too fast
+    slowMo: SLOW_MO_MS,
+    timeout: CONNECT_TIMEOUT_MS,
+  });
+}
+
+/**
+ * Debug escape hatch: run a visible browser on this machine so the operator can
+ * watch the flow, instead of driving the remote one.
+ *
+ * Only works in a dev checkout. playwright-core ships no browser binary and
+ * finds one here solely because the full playwright package - a devDependency -
+ * downloaded it into the shared cache. A production install has neither, so
+ * turning this on there fails at launch rather than silently doing something
+ * unexpected.
+ */
+async function launchLocalBrowser(): Promise<Browser> {
+  logger.warn('Local browser debug mode is on - launching a visible browser');
+  return chromium.launch({ headless: false, slowMo: SLOW_MO_MS });
+}
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
 
@@ -57,16 +96,12 @@ export async function humanType(
 
 // ─── Kakao login ────────────────────────────────────────────────────────────
 
-/**
- * Log in with a Kakao account and wait for mobile auth approval.
- * @param mobileAuthTimeoutMs Maximum wait time for mobile auth (default 5 min)
- */
+/** Log in with a Kakao account and land on the Tistory manage page */
 export async function kakaoLogin(
   page: Page,
   kakaoId: string,
   kakaoPassword: string,
   blogName: string,
-  mobileAuthTimeoutMs = 300_000,
 ): Promise<void> {
   // 1. Click "Login with Kakao account" button
   logger.log('Clicking Kakao login button');
@@ -92,19 +127,19 @@ export async function kakaoLogin(
   logger.log('Clicking login button');
   await page.click('button[type="submit"].btn_g.highlight.submit');
 
-  // 7. Wait for mobile auth approval
-  logger.log(
-    `Waiting for mobile auth (up to ${mobileAuthTimeoutMs / 60_000} min)`,
-  );
-  await page.waitForSelector('button.btn_agree[name="user_oauth_approval"]', {
-    timeout: mobileAuthTimeoutMs,
-  });
+  // 7. Confirm the interstitial Kakao shows after the credential form.
+  // Kakao does not always insert this step, so a missing button means we are
+  // already past it - not a failure.
+  const confirmButton = 'button[type="submit"].btn_g.btn_confirm';
+  try {
+    await page.waitForSelector(confirmButton, { timeout: 10_000 });
+    logger.log('Clicking confirm button');
+    await page.click(confirmButton);
+  } catch {
+    logger.log('No confirm step presented, continuing');
+  }
 
-  // 8. Click Continue button
-  logger.log('Clicking Continue button');
-  await page.click('button.btn_agree[name="user_oauth_approval"]');
-
-  // 9. Wait to reach the manage page
+  // 8. Wait to reach the manage page
   await page.waitForURL(`**//${blogName}.tistory.com/manage**`, {
     timeout: 30_000,
   });
@@ -320,7 +355,7 @@ export async function handlePublishModal(
 
 /** Create a browser context from a saved session, or a fresh context if none exists */
 export async function createContextFromSession(
-  browser: Awaited<ReturnType<typeof chromium.launch>>,
+  browser: Browser,
   sessionProvider: TistorySessionProvider,
 ): Promise<BrowserContext> {
   const session = await sessionProvider.getSession();
@@ -351,8 +386,9 @@ async function extractPermalinkFromPostsResponse(
 
 /**
  * Full Tistory publish flow.
- * Accepts headless flag and an optional waitForConfirm hook so it can be reused
- * by both the NestJS processor and standalone scripts.
+ * Drives a remote browser - or a local one under useLocalBrowser - and takes an
+ * optional waitForConfirm hook so it can be reused by both the NestJS processor
+ * and standalone scripts.
  */
 export async function runTistoryPublish(opts: {
   draft: TistoryDraftData;
@@ -362,7 +398,10 @@ export async function runTistoryPublish(opts: {
   kakaoPassword: string;
   /** Tistory blog name (the subdomain of <name>.tistory.com) */
   blogName: string;
-  headless?: boolean;
+  /** WebSocket endpoint of the remote browser; unused when useLocalBrowser is set */
+  browserlessUrl?: string;
+  /** Debug only: launch a visible browser here instead of using browserlessUrl */
+  useLocalBrowser?: boolean;
   /** Optional confirmation step before publishing (script use only) */
   waitForConfirm?: () => Promise<void>;
 }): Promise<TistoryPublishResult> {
@@ -373,16 +412,22 @@ export async function runTistoryPublish(opts: {
     kakaoId,
     kakaoPassword,
     blogName,
-    headless = true,
+    browserlessUrl,
+    useLocalBrowser = false,
     waitForConfirm,
   } = opts;
 
+  if (!useLocalBrowser && !browserlessUrl) {
+    throw new Error(
+      'browserlessUrl is required unless useLocalBrowser is enabled.',
+    );
+  }
+
   const htmlContent = buildHtmlContent(draft);
 
-  const browser = await chromium.launch({
-    headless,
-    slowMo: headless ? 50 : 100,
-  });
+  const browser = useLocalBrowser
+    ? await launchLocalBrowser()
+    : await connectRemoteBrowser(browserlessUrl);
 
   const context = await createContextFromSession(browser, sessionProvider);
   const page = await context.newPage();
@@ -483,5 +528,4 @@ export async function runTistoryPublish(opts: {
     }
     await browser.close();
   }
-  return { permalink: null };
 }
