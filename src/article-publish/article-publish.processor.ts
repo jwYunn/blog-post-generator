@@ -1,10 +1,14 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
-import { ArticlePublishRecordEntity, PublishSchedule } from './article-publish-record.entity';
+import {
+  ArticlePublishRecordEntity,
+  PublishSchedule,
+} from './article-publish-record.entity';
 import { TistorySessionService } from './tistory/tistory-session.service';
 import { runTistoryPublish } from './tistory/tistory-automation';
 import { PublishMode } from './tistory/tistory.types';
@@ -24,6 +28,7 @@ export class ArticlePublishProcessor extends WorkerHost {
     @InjectRepository(ArticlePublishRecordEntity)
     private readonly publishRecordRepository: Repository<ArticlePublishRecordEntity>,
     private readonly tistorySessionService: TistorySessionService,
+    private readonly configService: ConfigService,
   ) {
     super();
   }
@@ -46,11 +51,16 @@ export class ArticlePublishProcessor extends WorkerHost {
     await this.draftRepository.save(draft);
 
     try {
-      const kakaoId = process.env.KAKAO_ID;
-      const kakaoPassword = process.env.KAKAO_PASSWORD;
+      const kakaoId = this.configService.get<string>('KAKAO_ID');
+      const kakaoPassword = this.configService.get<string>('KAKAO_PASSWORD');
       if (!kakaoId || !kakaoPassword) {
-        throw new Error('KAKAO_ID or KAKAO_PASSWORD environment variable is not set.');
+        throw new Error(
+          'KAKAO_ID or KAKAO_PASSWORD environment variable is not set.',
+        );
       }
+      // Guaranteed present - validateEnv rejects startup without it
+      const blogName =
+        this.configService.getOrThrow<string>('TISTORY_BLOG_NAME');
 
       const publishMode: PublishMode =
         mode === 'schedule' && scheduledAt
@@ -69,6 +79,7 @@ export class ArticlePublishProcessor extends WorkerHost {
         sessionProvider: this.tistorySessionService,
         kakaoId,
         kakaoPassword,
+        blogName,
         headless: true,
       });
 

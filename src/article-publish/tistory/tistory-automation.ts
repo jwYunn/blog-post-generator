@@ -3,12 +3,16 @@
  * Shared between the NestJS processor and standalone scripts.
  */
 import { Logger } from '@nestjs/common';
-import { Page, BrowserContext, chromium } from 'playwright';
+import { Page, BrowserContext, chromium } from 'playwright-core';
 import { marked } from 'marked';
-import { PublishMode, TistoryDraftData, TistoryPublishResult, TistorySessionProvider } from './tistory.types';
+import {
+  PublishMode,
+  TistoryDraftData,
+  TistoryPublishResult,
+  TistorySessionProvider,
+} from './tistory.types';
 import { stripTitleCategory } from '../../common/utils/title.util';
 
-const BLOG_NAME = process.env.TISTORY_BLOG_NAME || 'fromdeepwithin';
 const logger = new Logger('TistoryAutomation');
 
 // ─── Utilities ──────────────────────────────────────────────────────────────
@@ -61,6 +65,7 @@ export async function kakaoLogin(
   page: Page,
   kakaoId: string,
   kakaoPassword: string,
+  blogName: string,
   mobileAuthTimeoutMs = 300_000,
 ): Promise<void> {
   // 1. Click "Login with Kakao account" button
@@ -88,7 +93,9 @@ export async function kakaoLogin(
   await page.click('button[type="submit"].btn_g.highlight.submit');
 
   // 7. Wait for mobile auth approval
-  logger.log(`Waiting for mobile auth (up to ${mobileAuthTimeoutMs / 60_000} min)`);
+  logger.log(
+    `Waiting for mobile auth (up to ${mobileAuthTimeoutMs / 60_000} min)`,
+  );
   await page.waitForSelector('button.btn_agree[name="user_oauth_approval"]', {
     timeout: mobileAuthTimeoutMs,
   });
@@ -98,7 +105,7 @@ export async function kakaoLogin(
   await page.click('button.btn_agree[name="user_oauth_approval"]');
 
   // 9. Wait to reach the manage page
-  await page.waitForURL(`**//${BLOG_NAME}.tistory.com/manage**`, {
+  await page.waitForURL(`**//${blogName}.tistory.com/manage**`, {
     timeout: 30_000,
   });
   logger.log('Login complete');
@@ -168,7 +175,9 @@ export async function fillHtmlViaModal(
       cm.refresh();
       return true;
     }
-    const ta = dialog.querySelector('textarea.textarea') as HTMLTextAreaElement | null;
+    const ta = dialog.querySelector(
+      'textarea.textarea',
+    ) as HTMLTextAreaElement | null;
     if (ta) {
       ta.value = content;
       ta.dispatchEvent(new Event('input', { bubbles: true }));
@@ -227,7 +236,8 @@ export async function navigateCalendarTo(
     if (curYear === targetYear && curMonth === targetMonth) break;
 
     const isAhead =
-      curYear < targetYear || (curYear === targetYear && curMonth < targetMonth);
+      curYear < targetYear ||
+      (curYear === targetYear && curMonth < targetMonth);
 
     if (isAhead) {
       await page.click('.btn_arr.btn_next');
@@ -297,7 +307,9 @@ export async function handlePublishModal(
     // Set hour and minute
     await page.fill('#dateHour', String(targetHour));
     await page.fill('#dateMinute', String(targetMinute));
-    logger.log(`Time set: ${targetHour}:${String(targetMinute).padStart(2, '0')}`);
+    logger.log(
+      `Time set: ${targetHour}:${String(targetMinute).padStart(2, '0')}`,
+    );
 
     await page.click('#publish-btn');
     logger.log(`Scheduled publish complete: ${datetime.toISOString()}`);
@@ -322,7 +334,7 @@ export async function createContextFromSession(
 
 /** Extract the permalink of the most recently created post from a posts.json response */
 async function extractPermalinkFromPostsResponse(
-  responsePromise: Promise<import('playwright').Response>,
+  responsePromise: Promise<import('playwright-core').Response>,
 ): Promise<string | null> {
   try {
     const response = await responsePromise;
@@ -348,6 +360,8 @@ export async function runTistoryPublish(opts: {
   sessionProvider: TistorySessionProvider;
   kakaoId: string;
   kakaoPassword: string;
+  /** Tistory blog name (the subdomain of <name>.tistory.com) */
+  blogName: string;
   headless?: boolean;
   /** Optional confirmation step before publishing (script use only) */
   waitForConfirm?: () => Promise<void>;
@@ -358,6 +372,7 @@ export async function runTistoryPublish(opts: {
     sessionProvider,
     kakaoId,
     kakaoPassword,
+    blogName,
     headless = true,
     waitForConfirm,
   } = opts;
@@ -375,7 +390,7 @@ export async function runTistoryPublish(opts: {
   try {
     // 1. Check login status
     logger.log('Navigating to Tistory manage page');
-    await page.goto(`https://${BLOG_NAME}.tistory.com/manage`, {
+    await page.goto(`https://${blogName}.tistory.com/manage`, {
       waitUntil: 'domcontentloaded',
     });
 
@@ -394,7 +409,7 @@ export async function runTistoryPublish(opts: {
       }
 
       logger.warn('Login required. Starting Kakao auto-login.');
-      await kakaoLogin(page, kakaoId, kakaoPassword);
+      await kakaoLogin(page, kakaoId, kakaoPassword, blogName);
     } else {
       logger.log('Login status verified');
     }
@@ -405,7 +420,7 @@ export async function runTistoryPublish(opts: {
 
     // 2. Navigate to new post page
     logger.log('Navigating to new post page');
-    await page.goto(`https://${BLOG_NAME}.tistory.com/manage/newpost`, {
+    await page.goto(`https://${blogName}.tistory.com/manage/newpost`, {
       waitUntil: 'networkidle',
     });
 
@@ -438,7 +453,7 @@ export async function runTistoryPublish(opts: {
     // waitForResponse registers a promise, so it must be set up before the button click
     const postsJsonResponsePromise = page.waitForResponse(
       (res) =>
-        res.url().includes(`${BLOG_NAME}.tistory.com/manage/posts.json`) &&
+        res.url().includes(`${blogName}.tistory.com/manage/posts.json`) &&
         res.status() === 200,
       { timeout: 30_000 },
     );
@@ -447,7 +462,9 @@ export async function runTistoryPublish(opts: {
     await handlePublishModal(page, publishMode);
 
     // 9. Extract permalink
-    const permalink = await extractPermalinkFromPostsResponse(postsJsonResponsePromise);
+    const permalink = await extractPermalinkFromPostsResponse(
+      postsJsonResponsePromise,
+    );
     if (permalink) {
       logger.log(`Publish complete - permalink: ${permalink}`);
     } else {
