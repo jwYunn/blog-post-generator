@@ -15,10 +15,12 @@ import { ArticlePublishModule } from './article-publish/article-publish.module';
 import { TopicEvaluateModule } from './topic-evaluate/topic-evaluate.module';
 import { ApiSourceModule } from './api-source/api-source.module';
 import { ThumbnailGeneratorModule } from './thumbnail-generator/thumbnail-generator.module';
+import { HealthModule } from './health/health.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -56,6 +58,7 @@ import { ThumbnailGeneratorModule } from './thumbnail-generator/thumbnail-genera
     ArticlePublishModule,
     ApiSourceModule,
     ThumbnailGeneratorModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
