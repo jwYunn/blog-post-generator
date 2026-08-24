@@ -1,28 +1,4 @@
-import { Type } from 'class-transformer';
-import {
-  IsIn,
-  IsISO8601,
-  IsObject,
-  IsOptional,
-  IsString,
-  IsUrl,
-  IsUUID,
-  ValidateIf,
-  ValidateNested,
-} from 'class-validator';
-
-class ScheduleNowDto {
-  @IsIn(['now'])
-  mode: 'now';
-}
-
-class ScheduleReservedDto {
-  @IsIn(['schedule'])
-  mode: 'schedule';
-
-  @IsISO8601()
-  scheduledAt: string;
-}
+import { IsObject, IsOptional, IsUrl, IsUUID } from 'class-validator';
 
 export class CreatePublishRecordDto {
   @IsUUID()

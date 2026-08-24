@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ARTICLE_PUBLISH_QUEUE, PUBLISH_ARTICLE_JOB } from './constants';
-import { CreatePublishJobDto, PublishJobMode } from './dto/create-publish-job.dto';
+import { CreatePublishJobDto } from './dto/create-publish-job.dto';
 
 @Injectable()
 export class ArticlePublishService {
@@ -11,7 +11,10 @@ export class ArticlePublishService {
     private readonly publishQueue: Queue,
   ) {}
 
-  async addPublishJob(articleDraftId: string, dto: CreatePublishJobDto): Promise<{ jobId: string }> {
+  async addPublishJob(
+    articleDraftId: string,
+    dto: CreatePublishJobDto,
+  ): Promise<{ jobId: string }> {
     const job = await this.publishQueue.add(PUBLISH_ARTICLE_JOB, {
       articleDraftId,
       mode: dto.mode,
