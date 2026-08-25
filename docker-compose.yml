@@ -71,6 +71,10 @@ services:
 
   app:
     image: ${APP_IMAGE:-blog-post-generator:latest}
+    # Lets a checkout build its own image, locally or on the server before CI
+    # exists. Once the pipeline runs, APP_IMAGE points at the GHCR tag and this
+    # is never used - `up` prefers the named image when it is already present.
+    build: .
     container_name: blog-generator-app
     logging: *default-logging
     # One .env serves both local runs and the server; only the addresses that
@@ -110,12 +114,43 @@ services:
     stop_grace_period: 60s
     restart: unless-stopped
 
-# The frontend deliberately lives in its own compose file, in its own
-# repository. It is a static SPA that reaches this API from the browser - see
-# CORS_ORIGIN - so it shares no network with these services, and keeping it here
-# would only mean two pipelines editing one compose file. The single thing that
-# has to line up is the host port nginx proxies to, and CORS_ORIGIN naming the
-# frontend's origin.
+  nginx:
+    image: nginx:alpine
+    container_name: blog-generator-nginx
+    logging: *default-logging
+    # Path routing only - TLS is Cloudflare's job and the tunnel leg is already
+    # encrypted. Deliberately publishes no host port: the tunnel is the only way
+    # in, so there is no origin address to bypass Cloudflare Access with.
+    volumes:
+      - ./deploy/nginx/blog.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/health']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: blog-generator-cloudflared
+    logging: *default-logging
+    # Dials out to Cloudflare, so the host needs no inbound port at all. The
+    # tunnel and its ingress rule (blog.dev-jaden.com -> http://nginx:80) are
+    # configured in the Cloudflare dashboard; TUNNEL_TOKEN is what binds this
+    # container to them.
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - nginx
+    restart: unless-stopped
+
+# The frontend ships from its own repository. Whether it joins this compose file
+# or runs beside it, nginx reaches it as "fe" on this network - see the resolver
+# note in deploy/nginx/blog.conf for why its absence does not stop nginx.
 
 volumes:
   redis_data:

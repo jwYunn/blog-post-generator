@@ -22,6 +22,9 @@ test
 load.ts
 test.ts
 
+# Mounted into the nginx service by compose, never built into the app image
+deploy
+
 coverage
 tmp
 *.log
