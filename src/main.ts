@@ -20,6 +20,11 @@ async function bootstrap() {
     }),
   );
 
+  // Without this Nest ignores SIGTERM and the process dies mid-job on redeploy.
+  // The publish worker drives a live Tistory editor session and is not retried
+  // when it stalls, so an abrupt kill can leave a half-created post behind.
+  app.enableShutdownHooks();
+
   const port = configService.get<number>('PORT', 3000);
   // Bind to all interfaces so the app is reachable from outside its container
   await app.listen(port, '0.0.0.0');

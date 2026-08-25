@@ -1,27 +1,121 @@
-version: '3.8'
+# Docker's json-file driver keeps every line forever by default. On a VPS that
+# fills the disk over months, and postgres is what dies first when it does -
+# a failure that looks like everything breaking at once for no reason.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
 
 services:
   redis:
     image: redis:7-alpine
     container_name: blog-generator-redis
+    logging: *default-logging
+    # Loopback only. Everything that needs Redis reaches it over the compose
+    # network; publishing on 0.0.0.0 would expose it to the internet on a VPS.
+    # The host port is its own variable: REDIS_PORT is what clients connect to,
+    # and inside the network that is always 6379 no matter what the host maps.
     ports:
-      - '${REDIS_PORT:-6379}:6379'
+      - '127.0.0.1:${REDIS_HOST_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
     container_name: blog-generator-postgres
+    logging: *default-logging
     ports:
-      - '${POSTGRES_PORT:-5432}:5432'
+      - '127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432'
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
+
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    container_name: blog-generator-browserless
+    logging: *default-logging
+    environment:
+      # Must outlast a whole publish run. The 30s default tears the browser
+      # down mid-flow.
+      TIMEOUT: 600000
+      # article-publish runs one job at a time, so one browser is enough
+      CONCURRENT: 1
+    # Chromium crashes when /dev/shm is the 64MB Docker default
+    shm_size: 1gb
+    # Deliberately not published to the host: only the app talks to it, over the
+    # compose network. If you ever need to expose it, set TOKEN here and append
+    # ?token=<value> to BROWSERLESS_URL.
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/pressure']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  app:
+    image: ${APP_IMAGE:-blog-post-generator:latest}
+    container_name: blog-generator-app
+    logging: *default-logging
+    # One .env serves both local runs and the server; only the addresses that
+    # differ inside the compose network are overridden here.
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      # Container ports, not the host mappings above - a .env that shifts the
+      # host port to dodge a local conflict must not follow the app in here
+      POSTGRES_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      BROWSERLESS_URL: ws://browserless:3000/chromium/playwright
+      # The debug switch launches a browser in-process, which this image has no
+      # binary for. Pinned off so a stray .env value cannot break the container.
+      BROWSER_DEBUG_LOCAL: 'false'
+    ports:
+      - '127.0.0.1:${PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      browserless:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:3000/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # A publish job drives a live Tistory editor session for minutes at a time
+    # and is not retried if its worker dies (maxStalledCount is 0), so a redeploy
+    # has to let BullMQ finish rather than kill the process mid-post. Paired with
+    # enableShutdownHooks() in main.ts - without that, SIGTERM is ignored and
+    # this grace period buys nothing.
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+# The frontend deliberately lives in its own compose file, in its own
+# repository. It is a static SPA that reaches this API from the browser - see
+# CORS_ORIGIN - so it shares no network with these services, and keeping it here
+# would only mean two pipelines editing one compose file. The single thing that
+# has to line up is the host port nginx proxies to, and CORS_ORIGIN naming the
+# frontend's origin.
 
 volumes:
   redis_data:

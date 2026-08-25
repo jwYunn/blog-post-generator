@@ -1,0 +1,37 @@
+# Reinstalled inside the image for the target platform
+node_modules
+
+# Built inside the image; a host build would carry the wrong platform binaries
+dist
+
+# Must never reach the image: a build info file that outlives the outDir wipe
+# makes the incremental compiler emit a partial dist
+*.tsbuildinfo
+
+.git
+.gitignore
+
+# Secrets. The example stays so the image documents what it expects.
+.env
+.env.*
+!.env.example
+
+# Not part of the application build (see tsconfig.build.json excludes)
+scripts
+test
+load.ts
+test.ts
+
+coverage
+tmp
+*.log
+shot.png
+
+.vscode
+.claude
+docs
+README.md
+CLAUDE.md
+docker-compose.yml
+Dockerfile
+.dockerignore
