@@ -157,11 +157,26 @@ jobs:
               exit 1
             fi
 
+            # nginx keeps whatever config it read at startup. That config arrives
+            # as a bind mount, so compose sees no change to the service and
+            # leaves the container running with the old copy - a routing change
+            # would reach the server and never take effect. Validate first, so a
+            # broken config fails the deploy rather than the reload.
+            docker compose exec -T nginx nginx -t
+            docker compose exec -T nginx nginx -s reload
+
             docker compose exec -T app npm run migration:run:prod
 
             # Re-checked after migrating: a migration that breaks the schema the
             # running code expects would otherwise go unnoticed until first use.
             docker compose exec -T app wget --spider -q http://127.0.0.1:3000/health
+
+            # And again through nginx. Checking only the app let a deploy pass
+            # while every API call returned 502 - the app was healthy, but nginx
+            # was still routing to the address it had cached before the app was
+            # recreated on a new one.
+            docker compose exec -T nginx wget --spider -q http://127.0.0.1/health
+            docker compose exec -T nginx wget --spider -q http://127.0.0.1/api/health
 
             docker image prune -f
 
