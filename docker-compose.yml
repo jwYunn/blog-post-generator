@@ -148,9 +148,21 @@ services:
       - nginx
     restart: unless-stopped
 
-# The frontend ships from its own repository. Whether it joins this compose file
-# or runs beside it, nginx reaches it as "fe" on this network - see the resolver
-# note in deploy/nginx/blog.conf for why its absence does not stop nginx.
+  fe:
+    # Built and pushed from its own repository, which deploys it by setting
+    # FE_IMAGE and recreating just this service. It lives in this compose file
+    # rather than its own because nginx resolves it as "fe" over this network;
+    # a separate project would have to join the network anyway.
+    image: ${FE_IMAGE:-ghcr.io/jwyunn/blog-post-generator-fe:latest}
+    container_name: blog-generator-fe
+    logging: *default-logging
+    # No host port: it is reached through nginx, like the app.
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
 volumes:
   redis_data:
