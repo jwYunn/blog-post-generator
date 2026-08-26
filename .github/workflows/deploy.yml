@@ -1,0 +1,168 @@
+name: Build & Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Two pushes close together would otherwise race on the server, and whichever
+# deploy finished last would win regardless of which commit was newer.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  gate:
+    name: Lint, build, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Same skip the image build uses: the playwright devDependency would pull
+      # ~500MB of browsers that nothing here needs.
+      - name: Install dependencies
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      # lint:ci rather than lint - the latter carries --fix, which would repair
+      # violations in the runner and report success without anyone seeing them.
+      - name: Lint
+        run: npm run lint:ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
+
+  build-and-push:
+    name: Build & push image
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # GHCR rejects uppercase image paths, and the owner here is mixed case.
+      - name: Set lowercase image name
+        run: echo "IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # No platform is set on purpose: ubuntu-latest is amd64 and so is the
+      # server, so this builds natively rather than under emulation.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to VPS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deploys the exact commit's tag rather than :latest. Pulling :latest
+      # would mean a deploy could pick up whatever finished building most
+      # recently, which is not necessarily this commit.
+      - name: Resolve image reference
+        run: |
+          IMAGE_NAME=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          SHORT_SHA=$(echo '${{ github.sha }}' | cut -c1-7)
+          echo "APP_IMAGE=${{ env.REGISTRY }}/${IMAGE_NAME}:sha-${SHORT_SHA}" >> "$GITHUB_ENV"
+
+      # deploy/ carries the nginx config that compose mounts. Without it Docker
+      # creates a directory where the config should be and nginx fails to start.
+      - name: Copy compose files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: ${{ secrets.CONTABO_PORT }}
+          source: 'docker-compose.yml,deploy'
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Deploy and verify
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.CONTABO_HOST }}
+          username: ${{ secrets.CONTABO_USER }}
+          key: ${{ secrets.CONTABO_SSH_KEY }}
+          port: ${{ secrets.CONTABO_PORT }}
+          envs: APP_IMAGE
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            export APP_IMAGE
+            echo "Deploying $APP_IMAGE"
+
+            docker compose pull app
+
+            # No --no-deps: it would skip the service_healthy conditions, and
+            # nginx must not start before the app is actually serving.
+            docker compose up -d
+
+            # The container reports its own health, so waiting on it is the same
+            # check the compose healthcheck runs - no dependency on Cloudflare,
+            # which would bounce an unauthenticated request to a login page.
+            echo "Waiting for app to become healthy..."
+            for i in $(seq 1 36); do
+              STATUS=$(docker inspect -f '{{.State.Health.Status}}' blog-generator-app 2>/dev/null || echo missing)
+              [ "$STATUS" = "healthy" ] && break
+              sleep 5
+            done
+
+            if [ "$STATUS" != "healthy" ]; then
+              echo "App did not become healthy (last status: $STATUS)"
+              docker compose logs --tail=80 app
+              exit 1
+            fi
+
+            docker compose exec -T app npm run migration:run:prod
+
+            # Re-checked after migrating: a migration that breaks the schema the
+            # running code expects would otherwise go unnoticed until first use.
+            docker compose exec -T app wget --spider -q http://127.0.0.1:3000/health
+
+            docker image prune -f
+
+            docker compose ps
