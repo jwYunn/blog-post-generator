@@ -25,6 +25,21 @@ import {
   GENERATE_ARTICLE_OUTLINE_JOB,
 } from '../article-outline/article-outline.constants';
 
+/**
+ * Draft states a publish request may start from. REVIEW_READY is the normal
+ * route; FAILED and PUBLISHING are here so a run that died can be retried once
+ * its attempt record has been resolved. Whether that retry is actually safe is
+ * ArticlePublishService's call - it is the side that can see the records.
+ *
+ * Everything else is a draft with no finished content, and a request against
+ * one used to reach the worker and mark it failed on the way out.
+ */
+const PUBLISHABLE_STATUSES: ArticleDraftStatus[] = [
+  ArticleDraftStatus.REVIEW_READY,
+  ArticleDraftStatus.FAILED,
+  ArticleDraftStatus.PUBLISHING,
+];
+
 @Injectable()
 export class ArticleDraftService {
   constructor(
@@ -119,16 +134,16 @@ export class ArticleDraftService {
   async publish(
     id: string,
     dto: CreatePublishJobDto,
-  ): Promise<{ jobId: string }> {
+  ): Promise<{ jobId: string; publishRecordId: string }> {
     const draft = await this.findOne(id);
 
-    if (draft.status === ArticleDraftStatus.PUBLISHING) {
-      throw new ConflictException(
-        `ArticleDraft #${id} is already being published`,
-      );
-    }
     if (draft.status === ArticleDraftStatus.PUBLISHED) {
       throw new ConflictException(`ArticleDraft #${id} is already published`);
+    }
+    if (!PUBLISHABLE_STATUSES.includes(draft.status)) {
+      throw new ConflictException(
+        `ArticleDraft #${id} is not ready to publish (current: ${draft.status})`,
+      );
     }
 
     return this.articlePublishService.addPublishJob(id, dto);

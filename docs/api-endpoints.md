@@ -150,11 +150,24 @@ Approve or reject a candidate.
 
 **Approve side-effects** (transactional):
 1. Sets candidate `status = approved`
-2. Rejects all sibling candidates with `status = pending` for the same seed
-3. Creates `ArticleDraft` (if not already exists) with `status = queued`
-4. Enqueues `generate-article-outline` job
+2. Creates `ArticleDraft` with `status = queued`, or reuses the existing one
+3. Enqueues `generate-article-outline` — **only** for a newly created draft or
+   one in `failed`. An existing draft that is generating, awaiting review or
+   already published is left untouched, because regenerating it would overwrite
+   a finished article and desync a post that is already live.
 
-**Response** `200` — updated `TopicCandidate`
+Sibling candidates are **not** rejected; they stay `pending`.
+
+**Response** `200`
+```typescript
+{
+  id: string
+  status: 'approved'
+  articleDraftId: string
+  articleDraftCreated: boolean
+  pipelineQueued: boolean   // false when an existing draft was left alone
+}
+```
 
 ---
 
@@ -200,13 +213,19 @@ Trigger publishing to Tistory.
 }
 ```
 
-**Precondition**: Draft must be in `review_ready` status.
+**Preconditions**
+- Draft status must be `review_ready`, `failed` or `publishing`. Anything else
+  is rejected with `409` — previously such a request reached the worker and
+  marked the draft failed on its way out.
+- The draft must carry no publish attempt in `attempting` or `published`. A
+  `409` naming the record means someone has to check the blog and then delete
+  that record, or set its status to `failed`, before retrying.
 
 **Response** `201`
 ```typescript
 {
-  message: string
   jobId: string
+  publishRecordId: string   // attempt record, written before the job is queued
 }
 ```
 

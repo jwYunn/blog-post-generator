@@ -51,6 +51,12 @@ type ApproveResult = {
   status: 'approved';
   articleDraftId: string;
   articleDraftCreated: boolean;
+  /**
+   * Whether this approval actually started the generation pipeline. False when
+   * an existing draft was left alone, so the caller does not report work that
+   * is not happening.
+   */
+  pipelineQueued: boolean;
 };
 
 type RejectResult = {
@@ -216,16 +222,27 @@ export class TopicCandidateService {
         return { draft, articleDraftCreated };
       });
 
-    // 5. Enqueue after transaction commit
-    await this.articleOutlineQueue.add(GENERATE_ARTICLE_OUTLINE_JOB, {
-      articleDraftId: draft.id,
-    });
+    // 5. Enqueue after transaction commit, but only for a draft that has
+    // nothing to lose. Re-approving used to restart the pipeline regardless of
+    // where the existing draft had got to, which overwrote a finished article -
+    // and for a published one left the post that was already live disagreeing
+    // with the row behind it. A draft that failed outright is the one case
+    // where starting over is what the approval is asking for.
+    const pipelineQueued =
+      articleDraftCreated || draft.status === ArticleDraftStatus.FAILED;
+
+    if (pipelineQueued) {
+      await this.articleOutlineQueue.add(GENERATE_ARTICLE_OUTLINE_JOB, {
+        articleDraftId: draft.id,
+      });
+    }
 
     return {
       id,
       status: 'approved',
       articleDraftId: draft.id,
       articleDraftCreated,
+      pipelineQueued,
     };
   }
 

@@ -7,6 +7,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
+import { ArticlePublishRecordStatus } from './enums/article-publish-record-status.enum';
 
 export type PublishSchedule =
   | { mode: 'now' }
@@ -24,6 +25,26 @@ export class ArticlePublishRecordEntity {
   @JoinColumn({ name: 'draftId' })
   draft: ArticleDraftEntity;
 
+  /**
+   * Which blog this attempt targeted. Null only on rows written before the
+   * column existed, when a single blog was the only possibility.
+   */
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  blogName: string | null;
+
+  /**
+   * Whether the post actually went up. A record is written before the browser
+   * is driven, so this is what separates "never reached the blog" from "may
+   * already be live" once a run fails.
+   */
+  @Column({
+    type: 'enum',
+    enum: ArticlePublishRecordStatus,
+    default: ArticlePublishRecordStatus.ATTEMPTING,
+  })
+  status: ArticlePublishRecordStatus;
+
+  /** Null until the post is up, and after that only if extraction failed */
   @Column({ type: 'varchar', length: 500, nullable: true })
   permalink: string | null;
 

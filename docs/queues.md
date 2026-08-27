@@ -156,21 +156,29 @@ Saves `ArticleOutline` object to `draft.outline`:
 ```typescript
 {
   articleDraftId: string
+  publishRecordId: string  // attempt record created by ArticlePublishService
   mode: 'now' | 'schedule'
   scheduledAt?: string  // ISO 8601 datetime string, required if mode='schedule'
 }
 ```
 
+The `ArticlePublishRecord` is created by `ArticlePublishService.addPublishJob`
+**before** the job is queued, with `status = attempting` and the target
+`blogName`. The processor updates that row rather than creating one.
+
 ### Processor Steps
-1. Fetch `ArticleDraft` with all relations
-2. Validate `draft.content` exists
-3. Set `status = publishing`
-4. Load `KAKAO_ID` and `KAKAO_PASSWORD` from env via `ConfigService`
-5. Call `runTistoryPublish()` via `TistorySessionService` (Playwright automation)
-6. Receive `permalink` from Tistory
-7. Set `status = published`
-8. Create `ArticlePublishRecord` with `draftId`, `permalink`, `schedule`
-9. On error: set `status = failed`, save `errorMessage`
+1. Fetch the `ArticlePublishRecord` named by the payload
+2. Fetch `ArticleDraft` with all relations
+3. Validate `draft.content` exists
+4. Set draft `status = publishing`
+5. Load `KAKAO_ID` and `KAKAO_PASSWORD` from env via `ConfigService`; take
+   `blogName` from the record, falling back to `TISTORY_BLOG_NAME`
+6. Call `runTistoryPublish()` via `TistorySessionService` (Playwright automation),
+   passing `onBeforePublish` to mark the point past which a post may exist
+7. Set draft `status = published`; set record `status = published` + `permalink`
+8. On error: set draft `status = failed`, save `errorMessage`, and set record
+   `status = failed` **only** if `onBeforePublish` never fired. Otherwise the
+   record stays `attempting` for a human to resolve
 
 **Note**: Concurrency is 1 to avoid Tistory rate limiting / session conflicts.
 

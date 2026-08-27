@@ -134,10 +134,18 @@ Audit log of publishing events for each draft.
 |--------|------|-------------|-------|
 | `id` | UUID | PK | |
 | `draftId` | UUID | FK→article_drafts, CASCADE | |
-| `permalink` | VARCHAR(500) | NULLABLE | Published Tistory URL |
+| `status` | ENUM | NOT NULL, default `attempting` | `attempting` / `published` / `failed` |
+| `blogName` | VARCHAR(100) | NULLABLE | Target blog. Null only on rows predating the column |
+| `permalink` | VARCHAR(500) | NULLABLE | Published Tistory URL; null until the post is up |
 | `schedule` | JSONB | NULLABLE | `PublishSchedule` union |
 | `meta` | JSONB | NULLABLE | Extensible metadata |
 | `createdAt` | TIMESTAMP | NOT NULL | Auto |
+
+A row is written **before** the browser is driven, so its presence means an
+attempt started, not that it succeeded. `failed` is set only when the run
+stopped before the publish step; a run that died any later stays `attempting`,
+since the post may already exist. Republishing is blocked on both `attempting`
+and `published`.
 
 ### PublishSchedule shape (JSONB)
 ```typescript
@@ -245,3 +253,4 @@ Join table linking prompts to their generated images. Tracks which image is sele
 | 1774310400000 | AlterOverallScoreToDecimal | Change `overallScore` INT → DECIMAL(5,2) |
 | 1774396800000 | CreateApiSourcesTable | Create `api_sources` |
 | 1774483200000 | CreateThumbnailGeneratorTables | Create `thumbnail_prompts`, `thumbnails`, `thumbnail_prompt_mappings` |
+| 1774569600000 | AddPublishAttemptTrackingToPublishRecords | Add `status`, `blogName` to `article_publish_records` |

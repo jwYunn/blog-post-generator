@@ -6,6 +6,7 @@ import { ArticlePublishRecordEntity } from './article-publish-record.entity';
 import { QueryPublishRecordListDto } from './dto/query-publish-record-list.dto';
 import { CreatePublishRecordDto } from './dto/create-publish-record.dto';
 import { UpdatePublishRecordDto } from './dto/update-publish-record.dto';
+import { ArticlePublishRecordStatus } from './enums/article-publish-record-status.enum';
 
 @Injectable()
 export class ArticlePublishRecordService {
@@ -78,6 +79,8 @@ export class ArticlePublishRecordService {
 
     const record = this.recordRepository.create({
       draftId: dto.draftId,
+      status: dto.status ?? ArticlePublishRecordStatus.PUBLISHED,
+      blogName: dto.blogName ?? null,
       permalink: dto.permalink ?? null,
       schedule: dto.schedule ?? null,
       meta: dto.meta ?? null,
@@ -92,6 +95,8 @@ export class ArticlePublishRecordService {
   ): Promise<ArticlePublishRecordEntity> {
     const record = await this.findOne(id);
 
+    if (dto.status !== undefined) record.status = dto.status;
+    if (dto.blogName !== undefined) record.blogName = dto.blogName ?? null;
     if (dto.permalink !== undefined) record.permalink = dto.permalink ?? null;
     if (dto.schedule !== undefined) record.schedule = dto.schedule ?? null;
     if (dto.meta !== undefined) record.meta = dto.meta ?? null;

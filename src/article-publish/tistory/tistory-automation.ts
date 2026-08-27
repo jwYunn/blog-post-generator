@@ -404,6 +404,12 @@ export async function runTistoryPublish(opts: {
   useLocalBrowser?: boolean;
   /** Optional confirmation step before publishing (script use only) */
   waitForConfirm?: () => Promise<void>;
+  /**
+   * Fires just before the publish modal is driven. Everything up to this point
+   * leaves nothing behind on the blog, and everything after it may, so a caller
+   * that has to decide whether a retry is safe hooks in here.
+   */
+  onBeforePublish?: () => Promise<void>;
 }): Promise<TistoryPublishResult> {
   const {
     draft,
@@ -415,6 +421,7 @@ export async function runTistoryPublish(opts: {
     browserlessUrl,
     useLocalBrowser = false,
     waitForConfirm,
+    onBeforePublish,
   } = opts;
 
   if (!useLocalBrowser && !browserlessUrl) {
@@ -502,6 +509,13 @@ export async function runTistoryPublish(opts: {
         res.status() === 200,
       { timeout: 30_000 },
     );
+
+    // Announced before the modal rather than before the button inside it: the
+    // caller is deciding whether a post may exist, and erring early there costs
+    // a manual check, while erring late costs a duplicate post.
+    if (onBeforePublish) {
+      await onBeforePublish();
+    }
 
     logger.log('Publishing');
     await handlePublishModal(page, publishMode);

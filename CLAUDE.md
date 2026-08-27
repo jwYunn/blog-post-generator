@@ -32,6 +32,10 @@ Read these files to understand the system before suggesting features or changes:
 
 - All queue names and job names are defined as constants (not magic strings)
 - Article draft status transitions are strictly sequential; processors update status at each step
-- `TopicCandidate` approval is transactional: approving one rejects all siblings
+- `TopicCandidate` approval is transactional, and re-approving never restarts a
+  draft that has moved past `failed` - a finished or published article must not
+  be overwritten by a second approval
+- A publish attempt is recorded before the browser runs, not after it succeeds;
+  an attempt left unresolved blocks republishing until a human clears it
 - Content is written for Korean English learners (Korean UI + English examples)
 - Environment variables are loaded via `ConfigService` — never access `process.env` directly
