@@ -11,6 +11,7 @@ import {
   ARTICLE_CONTENT_QUEUE,
   GENERATE_ARTICLE_CONTENT_JOB,
 } from '../article-content/article-content.constants';
+import { jobFailed, jobStep } from '../common/queue/job-log.util';
 
 interface ArticleOutlineJobPayload {
   articleDraftId: string;
@@ -36,14 +37,30 @@ export class ArticleOutlineProcessor extends WorkerHost {
       relations: ['topicCandidate'],
     });
     if (!draft) {
-      throw new Error(`ArticleDraft #${articleDraftId} not found`);
+      const error = new Error(`ArticleDraft #${articleDraftId} not found`);
+      await jobFailed(job, error);
+      throw error;
     }
+
+    await jobStep(
+      job,
+      10,
+      `draft ${draft.id} "${draft.title}" (keyword: ${draft.keyword})`,
+    );
 
     draft.status = ArticleDraftStatus.GENERATING_OUTLINE;
     await this.draftRepository.save(draft);
 
     try {
       const candidate = draft.topicCandidate;
+
+      await jobStep(
+        job,
+        20,
+        `calling gpt-5 - intent: ${candidate?.searchIntent ?? 'n/a'}, ` +
+          `reader: ${candidate?.targetReader ?? 'n/a'}, ` +
+          `preview points: ${candidate?.outlinePreview?.length ?? 0}`,
+      );
 
       const outline = await this.articleOutlineAiService.generateOutline(
         draft.title,
@@ -53,15 +70,25 @@ export class ArticleOutlineProcessor extends WorkerHost {
         candidate?.outlinePreview ?? null,
       );
 
+      await jobStep(
+        job,
+        80,
+        `outline: ${outline.sections.length} sections, ${outline.faqs.length} FAQs`,
+      );
+
       draft.outline = outline;
       draft.status = ArticleDraftStatus.OUTLINE_GENERATED;
       draft.errorMessage = null;
       await this.draftRepository.save(draft);
 
-      await this.articleContentQueue.add(GENERATE_ARTICLE_CONTENT_JOB, {
-        articleDraftId: draft.id,
-      });
+      // The next job's id is what lets someone follow one article across queues
+      const next = await this.articleContentQueue.add(
+        GENERATE_ARTICLE_CONTENT_JOB,
+        { articleDraftId: draft.id },
+      );
+      await jobStep(job, 100, `done - queued article-content job ${next.id}`);
     } catch (error) {
+      await jobFailed(job, error);
       draft.status = ArticleDraftStatus.FAILED;
       draft.errorMessage =
         error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';

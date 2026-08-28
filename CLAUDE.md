@@ -39,3 +39,39 @@ Read these files to understand the system before suggesting features or changes:
   an attempt left unresolved blocks republishing until a human clears it
 - Content is written for Korean English learners (Korean UI + English examples)
 - Environment variables are loaded via `ConfigService` — never access `process.env` directly
+- Every queue processor records its progress on the job itself, not only to the
+  Nest logger — see Queue Logging below
+
+## Queue Logging
+
+Processors write to the **job's own log** (`job.log`) through the helpers in
+`src/common/queue/job-log.util.ts`. Bull Board renders these lines when a job is
+opened at `/queues`, and they outlive the container logs, which roll at 10MB × 3
+— by the time anyone opens a failed job stdout has usually moved on, while the
+job itself is retained for a week.
+
+- `jobStep(job, percent, message)` at each stage boundary — writes the line and
+  moves the progress bar
+- `jobLog(job, message)` for detail between boundaries
+- `jobFailed(job, error)` in every `catch`, before the error is rethrown
+- All three swallow their own errors: a lost log line must never fail a job, and
+  never replace the error being reported
+
+**A new queue gets the same treatment.** What its lines should carry:
+
+- **Identifiers** that tie the job back to rows — draft id, seed id, record id,
+  permalink, and the id of any job it enqueues next, which is what lets someone
+  follow one article across queues
+- **Quantities** — candidates returned, sections in the outline, characters of
+  content, bytes uploaded. Prefer the number someone would otherwise have to
+  query the database to find
+- **The external call about to happen**, named with its model or service, so a
+  job stuck on a slow API shows where it is stuck
+- **Anything irreversible**, written before it happens rather than after
+- **Early returns.** A processor that returns without doing its work still
+  completes successfully, so say why — otherwise the job looks like it ran
+
+Avoid lines that only announce that a step started or finished; the progress
+number already says that. Work that happens inside a helper (the Tistory browser
+automation, for instance) reports back through a callback so its milestones land
+on the job too.

@@ -75,10 +75,11 @@ export class TopicCandidateService {
     private readonly articleOutlineQueue: Queue,
   ) {}
 
+  /** Returns what it inserted so the caller can record it on the job */
   async saveMany(
     seedId: string,
     candidates: CandidatePayload[],
-  ): Promise<void> {
+  ): Promise<{ saved: number; skipped: number }> {
     const existing = await this.candidateRepository.find({
       where: { topicSeedId: seedId },
       select: ['keyword', 'title'],
@@ -107,6 +108,11 @@ export class TopicCandidateService {
     if (toSave.length > 0) {
       await this.candidateRepository.save(toSave);
     }
+
+    return {
+      saved: toSave.length,
+      skipped: candidates.length - toSave.length,
+    };
   }
 
   async findAll(dto: QueryTopicCandidateListDto): Promise<{

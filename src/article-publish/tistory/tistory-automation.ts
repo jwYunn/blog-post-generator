@@ -449,6 +449,12 @@ export async function runTistoryPublish(opts: {
    * that has to decide whether a retry is safe hooks in here.
    */
   onBeforePublish?: () => Promise<void>;
+  /**
+   * Sink for the step-by-step narration, mirrored from the container log. The
+   * publish job records these on itself, which is what remains once the
+   * container logs have rolled over.
+   */
+  onProgress?: (message: string) => Promise<void>;
 }): Promise<TistoryPublishResult> {
   const {
     draft,
@@ -461,7 +467,17 @@ export async function runTistoryPublish(opts: {
     useLocalBrowser = false,
     waitForConfirm,
     onBeforePublish,
+    onProgress,
   } = opts;
+
+  /** Narrate to the container log and to the caller's sink at once */
+  const report = async (
+    message: string,
+    level: 'log' | 'warn' = 'log',
+  ): Promise<void> => {
+    logger[level](message);
+    if (onProgress) await onProgress(message);
+  };
 
   if (!useLocalBrowser && !browserlessUrl) {
     throw new Error(
@@ -480,7 +496,7 @@ export async function runTistoryPublish(opts: {
 
   try {
     // 1. Check login status
-    logger.log('Navigating to Tistory manage page');
+    await report('Navigating to Tistory manage page');
     await page.goto(`https://${blogName}.tistory.com/manage`, {
       waitUntil: 'domcontentloaded',
     });
@@ -495,14 +511,14 @@ export async function runTistoryPublish(opts: {
       // If a cached session existed but failed, remove it from Redis
       const existing = await sessionProvider.getSession();
       if (existing) {
-        logger.warn('Saved session expired. Deleting session.');
+        await report('Saved session expired. Deleting session.', 'warn');
         await sessionProvider.deleteSession();
       }
 
-      logger.warn('Login required. Starting Kakao auto-login.');
+      await report('Login required. Starting Kakao auto-login.', 'warn');
       await kakaoLogin(page, kakaoId, kakaoPassword, blogName);
     } else {
-      logger.log('Login status verified');
+      await report('Login status verified - saved session still valid');
     }
 
     // Save session
@@ -510,28 +526,28 @@ export async function runTistoryPublish(opts: {
     await sessionProvider.saveSession(state);
 
     // 2. Navigate to new post page
-    logger.log('Navigating to new post page');
+    await report('Navigating to new post page');
     await page.goto(`https://${blogName}.tistory.com/manage/newpost`, {
       waitUntil: 'networkidle',
     });
 
     // 3. Select category
-    logger.log('Selecting category');
+    await report(`Selecting category "${draft.category}"`);
     await selectCategory(page, draft.category);
 
     // 4. Enter title
-    logger.log(`Entering title: ${draft.title}`);
+    await report(`Entering title: ${draft.title}`);
     await page.waitForSelector('#post-title-inp', { timeout: 10_000 });
     await page.click('#post-title-inp');
     await page.fill('#post-title-inp', draft.title);
 
     // 5. Enter HTML body
-    logger.log('Entering HTML content');
+    await report(`Entering HTML content (${htmlContent.length} chars)`);
     await fillHtmlViaModal(page, htmlContent);
 
     // 6. Enter hashtags
     if (draft.hashtags && draft.hashtags.length > 0) {
-      logger.log('Entering hashtags');
+      await report(`Entering ${draft.hashtags.length} hashtags`);
       await fillHashtags(page, draft.hashtags);
     }
 
@@ -556,7 +572,7 @@ export async function runTistoryPublish(opts: {
       await onBeforePublish();
     }
 
-    logger.log('Publishing');
+    await report(`Publishing (mode: ${publishMode.mode})`);
     await handlePublishModal(page, publishMode);
 
     // 9. Extract permalink
@@ -564,9 +580,9 @@ export async function runTistoryPublish(opts: {
       postsJsonResponsePromise,
     );
     if (permalink) {
-      logger.log(`Publish complete - permalink: ${permalink}`);
+      await report(`Publish complete - permalink: ${permalink}`);
     } else {
-      logger.log('Publish complete (permalink extraction failed)');
+      await report('Publish complete, but permalink extraction failed', 'warn');
     }
 
     await page.waitForTimeout(3_000);

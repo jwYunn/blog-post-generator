@@ -12,6 +12,7 @@ import { runTistoryPublish } from './tistory/tistory-automation';
 import { PublishMode } from './tistory/tistory.types';
 import { ARTICLE_PUBLISH_QUEUE } from './constants';
 import { isEnabled } from '../config/env.validation';
+import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
 
 interface ArticlePublishJobPayload {
   articleDraftId: string;
@@ -45,19 +46,40 @@ export class ArticlePublishProcessor extends WorkerHost {
       where: { id: publishRecordId },
     });
     if (!record) {
-      throw new Error(`ArticlePublishRecord #${publishRecordId} not found`);
+      const error = new Error(
+        `ArticlePublishRecord #${publishRecordId} not found`,
+      );
+      await jobFailed(job, error);
+      throw error;
     }
+    await jobStep(
+      job,
+      5,
+      `attempt record ${record.id} (status ${record.status})`,
+    );
 
     const draft = await this.draftRepository.findOne({
       where: { id: articleDraftId },
       relations: ['topicCandidate', 'topicCandidate.topicSeed'],
     });
     if (!draft) {
-      throw new Error(`ArticleDraft #${articleDraftId} not found`);
+      const error = new Error(`ArticleDraft #${articleDraftId} not found`);
+      await jobFailed(job, error);
+      throw error;
     }
     if (!draft.content) {
-      throw new Error(`ArticleDraft #${articleDraftId} has no content`);
+      const error = new Error(`ArticleDraft #${articleDraftId} has no content`);
+      await jobFailed(job, error);
+      throw error;
     }
+
+    await jobStep(
+      job,
+      10,
+      `draft ${draft.id} "${draft.title}" - ${draft.content.length} chars, ` +
+        `${draft.hashtags?.length ?? 0} hashtags, ` +
+        `thumbnail: ${draft.thumbnailImageUrl ? 'yes' : 'none'}`,
+    );
 
     draft.status = ArticleDraftStatus.PUBLISHING;
     await this.draftRepository.save(draft);
@@ -93,6 +115,14 @@ export class ArticlePublishProcessor extends WorkerHost {
           ? { mode: 'schedule', datetime: new Date(scheduledAt) }
           : { mode: 'now' };
 
+      await jobStep(
+        job,
+        20,
+        `blog "${blogName}", mode ${mode}` +
+          `${scheduledAt ? ` at ${scheduledAt}` : ''}, ` +
+          `browser: ${useLocalBrowser ? 'local (debug)' : 'remote'}`,
+      );
+
       const { permalink } = await runTistoryPublish({
         draft: {
           title: draft.title,
@@ -110,8 +140,25 @@ export class ArticlePublishProcessor extends WorkerHost {
         useLocalBrowser,
         onBeforePublish: async () => {
           publishReached = true;
+          // Written before the click so it survives a worker killed mid-publish,
+          // which is exactly the case a person has to investigate afterwards
+          await jobLog(
+            job,
+            'PAST THE POINT OF NO RETURN - a post may now exist',
+          );
         },
+        // The browser half is where a publish actually spends its time, so its
+        // narration belongs on the job rather than only in the container log
+        onProgress: (message) => jobLog(job, message),
       });
+
+      await jobStep(
+        job,
+        90,
+        permalink
+          ? `published - permalink ${permalink}`
+          : 'published, but no permalink could be extracted',
+      );
 
       draft.status = ArticleDraftStatus.PUBLISHED;
       draft.errorMessage = null;
@@ -120,13 +167,25 @@ export class ArticlePublishProcessor extends WorkerHost {
       record.status = ArticlePublishRecordStatus.PUBLISHED;
       record.permalink = permalink;
       await this.publishRecordRepository.save(record);
+
+      await jobStep(job, 100, `done - record ${record.id} marked published`);
     } catch (error) {
+      await jobFailed(job, error);
       // Only a run that stopped before the publish step can be called clean.
       // Past that the post may be live, so the record stays ATTEMPTING and a
       // human decides whether republishing would duplicate it.
       if (!publishReached) {
         record.status = ArticlePublishRecordStatus.FAILED;
         await this.publishRecordRepository.save(record);
+        await jobLog(
+          job,
+          `record ${record.id} marked failed - nothing was posted, safe to retry`,
+        );
+      } else {
+        await jobLog(
+          job,
+          `record ${record.id} left attempting - check the blog before retrying`,
+        );
       }
 
       draft.status = ArticleDraftStatus.FAILED;

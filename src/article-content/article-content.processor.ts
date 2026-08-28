@@ -12,6 +12,7 @@ import {
   ARTICLE_THUMBNAIL_QUEUE,
   GENERATE_ARTICLE_THUMBNAIL_JOB,
 } from '../article-thumbnail/article-thumbnail.constants';
+import { jobFailed, jobStep } from '../common/queue/job-log.util';
 
 interface ArticleContentJobPayload {
   articleDraftId: string;
@@ -36,21 +37,39 @@ export class ArticleContentProcessor extends WorkerHost {
       where: { id: articleDraftId },
     });
     if (!draft) {
-      throw new Error(`ArticleDraft #${articleDraftId} not found`);
+      const error = new Error(`ArticleDraft #${articleDraftId} not found`);
+      await jobFailed(job, error);
+      throw error;
     }
     if (!draft.outline) {
-      throw new Error(`ArticleDraft #${articleDraftId} has no outline`);
+      const error = new Error(`ArticleDraft #${articleDraftId} has no outline`);
+      await jobFailed(job, error);
+      throw error;
     }
+
+    const outline = draft.outline as unknown as ArticleOutline;
+    await jobStep(
+      job,
+      10,
+      `draft ${draft.id} "${draft.title}" - outline has ` +
+        `${outline.sections.length} sections`,
+    );
 
     draft.status = ArticleDraftStatus.GENERATING_CONTENT;
     await this.draftRepository.save(draft);
 
     try {
+      await jobStep(
+        job,
+        20,
+        'calling claude-sonnet-4-6 (content) and claude-haiku-4-5 (hashtags) in parallel',
+      );
+
       const [content, hashtags] = await Promise.all([
         this.articleContentAiService.generateContent({
           title: draft.title,
           keyword: draft.keyword,
-          outline: draft.outline as unknown as ArticleOutline,
+          outline,
         }),
         this.articleContentAiService.generateHashtags({
           title: draft.title,
@@ -58,16 +77,27 @@ export class ArticleContentProcessor extends WorkerHost {
         }),
       ]);
 
+      // Length is the one number worth keeping: the prompt targets 1,800-2,500
+      // Korean characters, so a run that drifts shows up here first.
+      await jobStep(
+        job,
+        80,
+        `content: ${content.length} chars, hashtags: ${hashtags.length}`,
+      );
+
       draft.content = content;
       draft.hashtags = hashtags;
       draft.status = ArticleDraftStatus.CONTENT_GENERATED;
       draft.errorMessage = null;
       await this.draftRepository.save(draft);
 
-      await this.articleThumbnailQueue.add(GENERATE_ARTICLE_THUMBNAIL_JOB, {
-        articleDraftId: draft.id,
-      });
+      const next = await this.articleThumbnailQueue.add(
+        GENERATE_ARTICLE_THUMBNAIL_JOB,
+        { articleDraftId: draft.id },
+      );
+      await jobStep(job, 100, `done - queued article-thumbnail job ${next.id}`);
     } catch (error) {
+      await jobFailed(job, error);
       draft.status = ArticleDraftStatus.FAILED;
       draft.errorMessage =
         error instanceof Error ? error.message.slice(0, 500) : 'Unknown error';
