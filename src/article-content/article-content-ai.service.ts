@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { ArticleOutline } from '../article-outline/article-outline.types';
+import { parseJsonArrayResponse } from '../common/utils/ai-json.util';
 
 export interface GenerateContentInput {
   title: string;
@@ -16,6 +17,7 @@ export interface GenerateHashtagsInput {
 
 @Injectable()
 export class ArticleContentAiService {
+  private readonly logger = new Logger(ArticleContentAiService.name);
   private readonly anthropic: Anthropic;
 
   constructor(private readonly configService: ConfigService) {
@@ -125,17 +127,13 @@ Example format: ["#영어공부", "#EnglishGrammar", "#영어표현", "#LearnEng
       .map((c: any) => c.text)
       .join('');
 
-    // Parse JSON array
-    const match = raw.match(/\[[\s\S]*\]/);
-    if (!match) {
-      throw new Error('Failed to parse hashtags response');
-    }
+    const hashtags = parseJsonArrayResponse<string>(
+      raw,
+      'claude-haiku-4-5 hashtag generation',
+      this.logger,
+    );
 
-    const parsed: unknown = JSON.parse(match[0]);
-    if (!Array.isArray(parsed)) {
-      throw new Error('Hashtags response is not an array');
-    }
-
-    return (parsed as string[]).slice(0, 10);
+    // The prompt asks for exactly ten; the slice is what holds it to that
+    return hashtags.slice(0, 10);
   }
 }

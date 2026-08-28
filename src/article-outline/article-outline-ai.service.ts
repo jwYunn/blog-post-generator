@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { ArticleOutline } from './article-outline.types';
+import { parseJsonResponse } from '../common/utils/ai-json.util';
 
 @Injectable()
 export class ArticleOutlineAiService {
+  private readonly logger = new Logger(ArticleOutlineAiService.name);
   private readonly openai: OpenAI;
 
   constructor(private readonly configService: ConfigService) {
@@ -91,10 +93,10 @@ Schema:
 
     const text = completion.choices[0].message.content ?? '';
 
-    try {
-      return JSON.parse(text) as ArticleOutline;
-    } catch {
-      throw new Error('Invalid JSON from model');
-    }
+    return parseJsonResponse<ArticleOutline>(
+      text,
+      'gpt-5 outline generation',
+      this.logger,
+    );
   }
 }

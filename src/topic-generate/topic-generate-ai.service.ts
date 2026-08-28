@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import Anthropic from '@anthropic-ai/sdk';
 import { TOPIC_GENERATE_PROMPT } from './topic-generate-prompt';
 import type { CandidatePayload } from '../topic-candidate/topic-candidate.service';
+import { parseJsonArrayResponse } from '../common/utils/ai-json.util';
 
 interface AiCandidateItem {
   title: string;
@@ -38,19 +39,11 @@ export class TopicGenerateAiService {
     const text =
       message.content[0].type === 'text' ? message.content[0].text : '';
 
-    let items: AiCandidateItem[];
-    try {
-      // Strip markdown code fences if present
-      const clean = text
-        .replace(/^```(?:json)?\n?/, '')
-        .replace(/\n?```$/, '')
-        .trim();
-      items = JSON.parse(clean) as AiCandidateItem[];
-    } catch {
-      this.logger.error('Failed to parse Claude response. Raw response:');
-      this.logger.error(text);
-      throw new Error('Invalid JSON response from Claude');
-    }
+    const items = parseJsonArrayResponse<AiCandidateItem>(
+      text,
+      'claude-opus-4-5 topic generation',
+      this.logger,
+    );
 
     return items.map((item) => ({
       keyword: item.primary_keyword,

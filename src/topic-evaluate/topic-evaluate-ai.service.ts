@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import { TOPIC_EVALUATE_PROMPT } from './topic-evaluate-prompt';
 import type { EvaluationPayload } from '../topic-candidate/topic-candidate.service';
+import { parseJsonArrayResponse } from '../common/utils/ai-json.util';
 
 interface CandidateInput {
   id: string;
@@ -64,24 +65,11 @@ export class TopicEvaluateAiService {
 
     const text = response.choices[0]?.message?.content ?? '';
 
-    let items: RawEvaluationItem[];
-    try {
-      const clean = text
-        .replace(/^```(?:json)?\n?/, '')
-        .replace(/\n?```$/, '')
-        .trim();
-      items = JSON.parse(clean) as RawEvaluationItem[];
-    } catch {
-      this.logger.error(
-        'Failed to parse GPT evaluation response. Raw response:',
-      );
-      this.logger.error(text);
-      throw new Error('Invalid JSON response from GPT evaluation');
-    }
-
-    if (!Array.isArray(items)) {
-      throw new Error('GPT evaluation did not return an array');
-    }
+    const items = parseJsonArrayResponse<RawEvaluationItem>(
+      text,
+      'gpt-4o candidate evaluation',
+      this.logger,
+    );
 
     return items.map((item) => ({
       id: item.id,
