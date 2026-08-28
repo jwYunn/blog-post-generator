@@ -72,13 +72,34 @@ export function markdownToHtml(markdown: string): string {
   return marked.parse(markdown) as string;
 }
 
+/**
+ * Escape a value on its way into a double-quoted HTML attribute.
+ *
+ * Titles are written by a model against a brief that asks for English words in
+ * quotation marks, so a post about what "ghosting" means is the norm rather
+ * than an edge case. Interpolated raw, the first quote closes the attribute and
+ * the rest of the title lands in the post as stray markup.
+ */
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 /** Build full HTML body (thumbnail image + converted Markdown) */
 export function buildHtmlContent(draft: TistoryDraftData): string {
   const parts: string[] = [];
   if (draft.thumbnailImageUrl) {
+    // The URL is escaped too: S3 hands back query strings, and a bare & in an
+    // attribute is what separates a working image from a broken one.
+    const src = escapeHtmlAttribute(draft.thumbnailImageUrl);
+    const alt = escapeHtmlAttribute(stripTitleCategory(draft.title));
     parts.push(
       `<div style="text-align: center; margin-bottom: 24px;">` +
-        `<img src="${draft.thumbnailImageUrl}" alt="${stripTitleCategory(draft.title)}" style="max-width: 100%;">` +
+        `<img src="${src}" alt="${alt}" style="max-width: 100%;">` +
         `</div>`,
     );
   }

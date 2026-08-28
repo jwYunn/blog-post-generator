@@ -50,3 +50,67 @@ describe('buildHtmlContent', () => {
     expect(html).toContain('alt="Present perfect explained"');
   });
 });
+
+describe('buildHtmlContent, escaping attribute values', () => {
+  /** The alt value as the browser would read it, up to the closing quote */
+  function altAttribute(html: string): string | undefined {
+    return /alt="([^"]*)"/.exec(html)?.[1];
+  }
+
+  // The generation prompt asks for the English term in quotation marks, so a
+  // title carrying them is the normal case. Interpolated raw, the first one
+  // closes the attribute and the rest of the title becomes stray markup in the
+  // published post.
+  it('escapes quotation marks in the title', () => {
+    const html = buildHtmlContent(
+      buildDraft({
+        title: '[Meaning] What "ghosting" really means',
+        thumbnailImageUrl: THUMBNAIL,
+      }),
+    );
+
+    expect(altAttribute(html)).toBe('What &quot;ghosting&quot; really means');
+  });
+
+  it('escapes ampersands and angle brackets in the title', () => {
+    const html = buildHtmlContent(
+      buildDraft({
+        title: '[Grammar] <b> tags & how to read them',
+        thumbnailImageUrl: THUMBNAIL,
+      }),
+    );
+
+    expect(altAttribute(html)).toBe('&lt;b&gt; tags &amp; how to read them');
+  });
+
+  it('escapes an apostrophe in the title', () => {
+    const html = buildHtmlContent(
+      buildDraft({
+        title: "[Phrases] It's on me",
+        thumbnailImageUrl: THUMBNAIL,
+      }),
+    );
+
+    expect(altAttribute(html)).toBe('It&#39;s on me');
+  });
+
+  // S3 URLs arrive with query strings, and a bare & in an attribute is the
+  // difference between an image and a broken one.
+  it('escapes an ampersand in the thumbnail url', () => {
+    const html = buildHtmlContent(
+      buildDraft({
+        thumbnailImageUrl: 'https://cdn.example.com/thumb.png?v=2&size=large',
+      }),
+    );
+
+    expect(html).toContain(
+      'src="https://cdn.example.com/thumb.png?v=2&amp;size=large"',
+    );
+  });
+
+  it('leaves a title that needs no escaping unchanged', () => {
+    const html = buildHtmlContent(buildDraft({ thumbnailImageUrl: THUMBNAIL }));
+
+    expect(altAttribute(html)).toBe('Present perfect explained');
+  });
+});
