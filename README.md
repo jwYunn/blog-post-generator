@@ -122,13 +122,27 @@ npm test
 Unit tests sit next to the code they cover, as `*.spec.ts` under `src/`. The CI
 gate runs them before an image is built, so a failing test stops the deploy.
 
-What they cover is the handful of decisions that are expensive to get wrong
-rather than whatever is easiest to reach: the guard that stops a second approval
-regenerating an article that is already finished or live, and the one that
-decides whether a failed publish is safe to retry or has to be checked against
-the blog by hand first. Nothing here reaches Postgres, Redis, a browser or an AI
-provider — repositories and queues are stubbed and the Tistory automation is
-mocked, so the suite runs on a bare checkout.
+What they cover is the decisions that are expensive to get wrong rather than
+whatever is easiest to reach:
+
+- **The two guards.** A second approval must not regenerate an article that is
+  already finished or live, and a failed publish must be classified by whether
+  anything can have reached the blog — the difference between a safe retry and a
+  duplicate post.
+- **Every queue processor.** Each one is driven through its status transitions,
+  the job it queues next, and what it leaves behind when it fails. The early
+  returns are covered too: a processor that declines a job still completes, so
+  the test asserts it said why.
+- **The response parsers.** Models return the same payload fenced one day and
+  bare the next, so `parseJsonResponse` is tested against both, against prose
+  either side of the payload, and against a list handed back inside an object.
+- **The pure functions.** The category tag round trip, which the thumbnail
+  overlay and the image alt text both depend on; the conditional
+  `BROWSERLESS_URL` requirement; and the HTML body builder.
+
+Nothing here reaches Postgres, Redis, a browser or an AI provider — repositories
+and queues are stubbed and the Tistory automation is mocked, so the suite runs
+on a bare checkout in a few seconds.
 
 > [!NOTE]
 > `marked` is ESM-only. The app gets away with `require`-ing it because Node 22
