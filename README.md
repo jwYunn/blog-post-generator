@@ -113,6 +113,29 @@ local conflict must not follow the app into its container.
 
 Bull Board is available at `http://localhost:3000/queues` when the server is running.
 
+### Tests
+
+```bash
+npm test
+```
+
+Unit tests sit next to the code they cover, as `*.spec.ts` under `src/`. The CI
+gate runs them before an image is built, so a failing test stops the deploy.
+
+What they cover is the handful of decisions that are expensive to get wrong
+rather than whatever is easiest to reach: the guard that stops a second approval
+regenerating an article that is already finished or live, and the one that
+decides whether a failed publish is safe to retry or has to be checked against
+the blog by hand first. Nothing here reaches Postgres, Redis, a browser or an AI
+provider — repositories and queues are stubbed and the Tistory automation is
+mocked, so the suite runs on a bare checkout.
+
+> [!NOTE]
+> `marked` is ESM-only. The app gets away with `require`-ing it because Node 22
+> resolves ESM from CommonJS, but Jest's runtime does not, so the jest block in
+> `package.json` transforms that one package rather than skipping `node_modules`
+> wholesale.
+
 ## API Reference
 
 ### Topic Seeds
