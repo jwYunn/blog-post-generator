@@ -26,6 +26,17 @@ const SLOW_MO_MS = 50;
  */
 const CONNECT_TIMEOUT_MS = 30_000;
 
+/**
+ * How long to wait, after the credentials are submitted, for Kakao to land
+ * somewhere recognisable. Generous on purpose: the previous budget was 10s and
+ * expired before Kakao had responded at all, which the flow then read as "no
+ * interstitial was shown" and carried on regardless.
+ */
+const POST_SUBMIT_TIMEOUT_MS = 60_000;
+
+/** Budget for the redirect chain that follows the interstitial */
+const MANAGE_TIMEOUT_MS = 30_000;
+
 // ─── Browser acquisition ────────────────────────────────────────────────────
 
 /** Attach to the remote browser that runs the publish session */
@@ -127,22 +138,50 @@ export async function kakaoLogin(
   logger.log('Clicking login button');
   await page.click('button[type="submit"].btn_g.highlight.submit');
 
-  // 7. Confirm the interstitial Kakao shows after the credential form.
-  // Kakao does not always insert this step, so a missing button means we are
-  // already past it - not a failure.
+  // 7. Submitting leads to one of two places: straight through to the manage
+  // page, or an interstitial that has to be confirmed first. Kakao decides
+  // which, and takes a varying amount of time about it.
+  //
+  // Waiting a fixed budget for the interstitial and treating its absence as
+  // "already past it" conflated two different situations - a step that was
+  // never shown, and one that had not rendered yet. A slow response then fell
+  // through to the manage-page wait with the interstitial still on screen and
+  // nothing left to click it. Racing the two outcomes drops the assumption
+  // about ordering and timing alike; whichever arrives first is the answer.
   const confirmButton = 'button[type="submit"].btn_g.btn_confirm';
-  try {
-    await page.waitForSelector(confirmButton, { timeout: 10_000 });
-    logger.log('Clicking confirm button');
-    await page.click(confirmButton);
-  } catch {
-    logger.log('No confirm step presented, continuing');
+  const managePattern = `**//${blogName}.tistory.com/manage**`;
+
+  // Both branches swallow their own timeout so the loser cannot surface as an
+  // unhandled rejection once the race has already settled.
+  const outcome = await Promise.race([
+    page
+      .waitForURL(managePattern, { timeout: POST_SUBMIT_TIMEOUT_MS })
+      .then(() => 'manage' as const)
+      .catch(() => null),
+    page
+      .waitForSelector(confirmButton, { timeout: POST_SUBMIT_TIMEOUT_MS })
+      .then(() => 'confirm' as const)
+      .catch(() => null),
+  ]);
+
+  if (outcome === null) {
+    // Naming the landing spot matters: an additional-auth screen and a changed
+    // selector both stall here, and the URL is what tells them apart.
+    throw new Error(
+      `Kakao login reached neither the manage page nor a confirm step within ` +
+        `${POST_SUBMIT_TIMEOUT_MS / 1000}s. Stopped at: ${page.url()}`,
+    );
   }
 
-  // 8. Wait to reach the manage page
-  await page.waitForURL(`**//${blogName}.tistory.com/manage**`, {
-    timeout: 30_000,
-  });
+  // 8. Confirm if asked, then wait out the redirect chain to the manage page
+  if (outcome === 'confirm') {
+    logger.log('Confirm step presented - clicking through');
+    await page.click(confirmButton);
+    await page.waitForURL(managePattern, { timeout: MANAGE_TIMEOUT_MS });
+  } else {
+    logger.log('No confirm step - reached the manage page directly');
+  }
+
   logger.log('Login complete');
 }
 
