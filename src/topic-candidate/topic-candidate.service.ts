@@ -9,6 +9,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
+import { EvaluationScope } from './enums/evaluation-scope.enum';
 import {
   QueryTopicCandidateListDto,
   CandidateSortBy,
@@ -267,9 +268,18 @@ export class TopicCandidateService {
     return { id, status: 'rejected' };
   }
 
-  async findBySeedId(seedId: string): Promise<TopicCandidateEntity[]> {
+  /** Candidates an evaluation run should score - pending only unless asked */
+  async findBySeedId(
+    seedId: string,
+    scope: EvaluationScope = EvaluationScope.PENDING,
+  ): Promise<TopicCandidateEntity[]> {
     return this.candidateRepository.find({
-      where: { topicSeedId: seedId },
+      where: {
+        topicSeedId: seedId,
+        ...(scope === EvaluationScope.PENDING
+          ? { status: TopicCandidateStatus.PENDING }
+          : {}),
+      },
       order: { createdAt: 'ASC' },
     });
   }

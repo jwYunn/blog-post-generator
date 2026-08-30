@@ -24,6 +24,7 @@ import {
   TOPIC_EVALUATE_QUEUE,
   EVALUATE_TOPIC_CANDIDATES_JOB,
 } from '../topic-evaluate/topic-evaluate.constants';
+import { EvaluationScope } from '../topic-candidate/enums/evaluation-scope.enum';
 
 @Injectable()
 export class TopicSeedService {
@@ -157,12 +158,16 @@ export class TopicSeedService {
     };
   }
 
-  async evaluate(id: string): Promise<{ message: string; seedId: string }> {
-    const seed = await this.findOne(id);
+  async evaluate(
+    id: string,
+    scope: EvaluationScope = EvaluationScope.PENDING,
+  ): Promise<{ message: string; seedId: string }> {
+    // Existence check only - the job reads what it needs for itself
+    await this.findOne(id);
 
     await this.topicEvaluateQueue.add(EVALUATE_TOPIC_CANDIDATES_JOB, {
       seedId: id,
-      userInput: seed.seed,
+      scope,
     });
 
     return {

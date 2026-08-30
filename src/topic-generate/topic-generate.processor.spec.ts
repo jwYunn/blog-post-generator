@@ -1,6 +1,8 @@
 import { Job } from 'bullmq';
 import { TopicGenerateProcessor } from './topic-generate.processor';
 import { GENERATE_TOPIC_CANDIDATES_JOB } from './topic-generate.constants';
+import { EVALUATE_TOPIC_CANDIDATES_JOB } from '../topic-evaluate/topic-evaluate.constants';
+import { EvaluationScope } from '../topic-candidate/enums/evaluation-scope.enum';
 
 const SEED_ID = 'seed-1';
 
@@ -13,6 +15,7 @@ describe('TopicGenerateProcessor', () => {
   let seedService: any;
   let candidateService: any;
   let aiService: any;
+  let evaluateQueue: any;
   let job: Job;
   let processor: TopicGenerateProcessor;
 
@@ -42,12 +45,14 @@ describe('TopicGenerateProcessor', () => {
       saveMany: jest.fn(async () => ({ saved: 2, skipped: 0 })),
     };
     aiService = { generateCandidates: jest.fn(async () => CANDIDATES) };
+    evaluateQueue = { add: jest.fn(async () => ({ id: 42 })) };
     job = buildJob();
 
     processor = new TopicGenerateProcessor(
       seedService,
       candidateService,
       aiService,
+      evaluateQueue,
     );
   });
 
@@ -74,6 +79,49 @@ describe('TopicGenerateProcessor', () => {
     await processor.process(job);
 
     expect(jobLogText()).toContain('saved 1, skipped 4');
+  });
+
+  /**
+   * Scoring the candidates is always wanted and has no decision behind it, so
+   * generation queues it rather than waiting for a second button.
+   */
+  describe('chaining into the evaluation', () => {
+    it('queues the evaluation once the candidates are saved', async () => {
+      await processor.process(job);
+
+      expect(evaluateQueue.add).toHaveBeenCalledWith(
+        EVALUATE_TOPIC_CANDIDATES_JOB,
+        { seedId: SEED_ID, scope: EvaluationScope.PENDING },
+      );
+    });
+
+    // Following one seed across queues means knowing where it went next
+    it('records the id of the job it queued', async () => {
+      await processor.process(job);
+
+      expect(jobLogText()).toContain('queued topic-evaluate job 42');
+    });
+
+    /**
+     * Scoring is driven by what is pending rather than by what this run saved,
+     * so chaining unconditionally is also how candidates left unscored by an
+     * earlier failed evaluation get picked up.
+     */
+    it('queues the evaluation even when every candidate was a duplicate', async () => {
+      candidateService.saveMany.mockResolvedValue({ saved: 0, skipped: 10 });
+
+      await processor.process(job);
+
+      expect(evaluateQueue.add).toHaveBeenCalled();
+    });
+
+    it('queues nothing when the run failed', async () => {
+      candidateService.saveMany.mockRejectedValue(new Error('insert failed'));
+
+      await expect(processor.process(job)).rejects.toThrow();
+
+      expect(evaluateQueue.add).not.toHaveBeenCalled();
+    });
   });
 
   /**

@@ -1,6 +1,7 @@
 import { Job } from 'bullmq';
 import { TopicEvaluateProcessor } from './topic-evaluate.processor';
 import { EVALUATE_TOPIC_CANDIDATES_JOB } from './topic-evaluate.constants';
+import { EvaluationScope } from '../topic-candidate/enums/evaluation-scope.enum';
 
 const SEED_ID = 'seed-1';
 
@@ -36,10 +37,13 @@ describe('TopicEvaluateProcessor', () => {
   let job: Job;
   let processor: TopicEvaluateProcessor;
 
-  function buildJob(name = EVALUATE_TOPIC_CANDIDATES_JOB): Job {
+  function buildJob(
+    name = EVALUATE_TOPIC_CANDIDATES_JOB,
+    data: Record<string, unknown> = { seedId: SEED_ID },
+  ): Job {
     return {
       name,
-      data: { seedId: SEED_ID, userInput: 'present perfect' },
+      data,
       log: jest.fn(),
       updateProgress: jest.fn(),
     } as unknown as Job;
@@ -63,8 +67,53 @@ describe('TopicEvaluateProcessor', () => {
   it('scores the candidates on the seed and saves the result', async () => {
     await processor.process(job);
 
-    expect(candidateService.findBySeedId).toHaveBeenCalledWith(SEED_ID);
+    expect(candidateService.findBySeedId).toHaveBeenCalledWith(
+      SEED_ID,
+      EvaluationScope.PENDING,
+    );
     expect(candidateService.saveEvaluations).toHaveBeenCalledWith(EVALUATIONS);
+  });
+
+  /**
+   * Re-scoring a decided candidate overwrites the numbers its decision was made
+   * on, and costs a model call for an answer nobody acts on - so a run scores
+   * pending candidates unless it is explicitly asked for more.
+   */
+  describe('which candidates get scored', () => {
+    it('scores only pending candidates by default', async () => {
+      await processor.process(job);
+
+      expect(candidateService.findBySeedId).toHaveBeenCalledWith(
+        SEED_ID,
+        EvaluationScope.PENDING,
+      );
+    });
+
+    it('re-scores everything when the job asks for it', async () => {
+      job = buildJob(EVALUATE_TOPIC_CANDIDATES_JOB, {
+        seedId: SEED_ID,
+        scope: EvaluationScope.ALL,
+      });
+
+      await processor.process(job);
+
+      expect(candidateService.findBySeedId).toHaveBeenCalledWith(
+        SEED_ID,
+        EvaluationScope.ALL,
+      );
+    });
+
+    // Jobs queued before scoping existed carry no scope at all
+    it('falls back to pending when the job carries no scope', async () => {
+      job = buildJob(EVALUATE_TOPIC_CANDIDATES_JOB, { seedId: SEED_ID });
+
+      await processor.process(job);
+
+      expect(candidateService.findBySeedId).toHaveBeenCalledWith(
+        SEED_ID,
+        EvaluationScope.PENDING,
+      );
+    });
   });
 
   // The model is prompted with snake_case keys, so the mapping is part of the
@@ -139,7 +188,7 @@ describe('TopicEvaluateProcessor', () => {
 
       expect(aiService.evaluateCandidates).not.toHaveBeenCalled();
       expect(candidateService.saveEvaluations).not.toHaveBeenCalled();
-      expect(jobLogText()).toContain('no candidates on seed seed-1');
+      expect(jobLogText()).toContain('no pending candidates on seed seed-1');
     });
   });
 

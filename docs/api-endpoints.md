@@ -98,6 +98,20 @@ Enqueue a topic candidate generation job for this seed.
 ### POST /topic-seeds/:id/evaluate
 Enqueue a topic candidate evaluation job for this seed.
 
+Generation already chains into evaluation on its own, so this is for re-running
+one without regenerating.
+
+**Query params**
+```typescript
+{
+  scope?: 'pending' | 'all'   // default: 'pending'
+}
+```
+
+`pending` scores only candidates still awaiting a decision. `all` re-scores
+approved and rejected ones too, overwriting the numbers their decision was made
+on — reach for it when the rubric has changed, not otherwise.
+
 **Response** `201`
 ```typescript
 {

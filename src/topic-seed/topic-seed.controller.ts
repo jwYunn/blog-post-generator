@@ -16,6 +16,7 @@ import { TopicCandidateService } from '../topic-candidate/topic-candidate.servic
 import { CreateTopicSeedDto } from './dto/create-topic-seed.dto';
 import { UpdateTopicSeedDto } from './dto/update-topic-seed.dto';
 import { ListTopicSeedQueryDto } from './dto/list-topic-seed-query.dto';
+import { EvaluateSeedQueryDto } from './dto/evaluate-seed-query.dto';
 import { QueryTopicCandidateListDto } from '../topic-candidate/dto/query-topic-candidate-list.dto';
 
 @Controller('topic-seeds')
@@ -70,7 +71,10 @@ export class TopicSeedController {
   }
 
   @Post(':id/evaluate')
-  evaluate(@Param('id', ParseUUIDPipe) id: string) {
-    return this.topicSeedService.evaluate(id);
+  evaluate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: EvaluateSeedQueryDto,
+  ) {
+    return this.topicSeedService.evaluate(id, query.scope);
   }
 }

@@ -48,12 +48,24 @@ Creates N `TopicCandidate` rows (status=`pending`) linked to the seed.
 ```typescript
 {
   seedId: string   // UUID of TopicSeed
-  userInput: string  // Original seed text (passed to GPT for context)
+  scope?: 'pending' | 'all'   // defaults to 'pending'
 }
 ```
 
+`scope` decides which candidates are scored. **`pending` is the default and
+almost always what you want**: approved and rejected candidates have already
+been decided, so re-scoring them overwrites the numbers behind that decision —
+a published article's source candidate can come back ranked last or marked
+`drop` — and costs a model call per candidate on every run. Scoring the whole
+seed grew steadily more expensive the longer the seed had been in use, which
+stopped being tolerable once generation started chaining into evaluation.
+
+`all` re-scores everything on the seed and exists for one case: the rubric
+changed and old numbers are no longer comparable. Only the manual endpoint can
+ask for it, via `?scope=all`.
+
 ### Processor Steps
-1. Fetch all `TopicCandidate` rows for `seedId`
+1. Fetch the seed's `TopicCandidate` rows in `scope` (`pending` unless told otherwise)
 2. Build candidate input array with: id, title, keyword, searchIntent, targetReader, whyThisTopic, outlinePreview
 3. Call `TopicEvaluateAiService.evaluateCandidates(candidates)` → evaluation results
 4. Call `TopicCandidateService.saveEvaluations(evaluations)` → bulk update
@@ -226,4 +238,16 @@ article-thumbnail processor
   → on success → (no auto-chain; draft enters review_ready for manual publish)
 ```
 
-**Note**: `topic-generate` does NOT auto-chain to `topic-evaluate`. They are manually triggered independently.
+```
+topic-generate processor
+  → on success → enqueue topic-evaluate (scope: pending)
+```
+
+`topic-generate` chains **unconditionally**, including when every candidate it
+generated was a duplicate and nothing was saved. Evaluation scores whatever is
+still pending, so the chain doubles as the recovery path for candidates an
+earlier failed evaluation left unscored; with nothing pending the job says so
+and returns, at the cost of one query.
+
+`POST /topic-seeds/:id/evaluate` stays for re-running an evaluation without
+regenerating — and is the only way to pass `scope=all`.

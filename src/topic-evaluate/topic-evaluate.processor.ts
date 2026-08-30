@@ -8,10 +8,12 @@ import {
   EVALUATE_TOPIC_CANDIDATES_JOB,
 } from './topic-evaluate.constants';
 import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
+import { EvaluationScope } from '../topic-candidate/enums/evaluation-scope.enum';
 
 interface EvaluateJobPayload {
   seedId: string;
-  userInput: string;
+  /** Absent on jobs queued before scoping existed; those score pending only */
+  scope?: EvaluationScope;
 }
 
 @Processor(TOPIC_EVALUATE_QUEUE)
@@ -32,11 +34,14 @@ export class TopicEvaluateProcessor extends WorkerHost {
       return;
     }
 
-    const { seedId } = job.data;
+    const { seedId, scope = EvaluationScope.PENDING } = job.data;
     this.logger.log(`Processing evaluation job for seedId: ${seedId}`);
 
     try {
-      const candidates = await this.topicCandidateService.findBySeedId(seedId);
+      const candidates = await this.topicCandidateService.findBySeedId(
+        seedId,
+        scope,
+      );
       if (candidates.length === 0) {
         this.logger.warn(
           `No candidates found for seedId: ${seedId}, skipping evaluation`,
@@ -45,14 +50,14 @@ export class TopicEvaluateProcessor extends WorkerHost {
         await jobStep(
           job,
           100,
-          `no candidates on seed ${seedId} - nothing to do`,
+          `no ${scope} candidates on seed ${seedId} - nothing to do`,
         );
         return;
       }
       await jobStep(
         job,
         10,
-        `seed ${seedId} - ${candidates.length} candidates`,
+        `seed ${seedId} - ${candidates.length} ${scope} candidates to score`,
       );
 
       const candidateInputs = candidates.map((c) => ({

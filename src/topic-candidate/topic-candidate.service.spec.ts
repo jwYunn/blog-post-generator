@@ -4,6 +4,7 @@ import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.
 import { GENERATE_ARTICLE_OUTLINE_JOB } from '../article-outline/article-outline.constants';
 import { AllowedCandidateStatus } from './dto/update-topic-candidate-status.dto';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
+import { EvaluationScope } from './enums/evaluation-scope.enum';
 import { TopicCandidateEntity } from './topic-candidate.entity';
 import { TopicCandidateService } from './topic-candidate.service';
 
@@ -75,6 +76,7 @@ describe('TopicCandidateService', () => {
         ),
       },
       findOne: jest.fn(),
+      find: jest.fn(async () => []),
       save: jest.fn(async (entity) => entity),
     };
     draftRepository = {};
@@ -223,6 +225,34 @@ describe('TopicCandidateService', () => {
 
       await expect(approve()).rejects.toBeInstanceOf(NotFoundException);
       expect(outlineQueue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * This filter is what keeps an evaluation from re-scoring candidates whose
+   * decision has already been made, and what ties its cost to the pending count
+   * rather than to how long the seed has been in use.
+   */
+  describe('choosing which candidates an evaluation sees', () => {
+    it('asks for pending candidates only by default', async () => {
+      await service.findBySeedId('seed-1');
+
+      expect(candidateRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            topicSeedId: 'seed-1',
+            status: TopicCandidateStatus.PENDING,
+          },
+        }),
+      );
+    });
+
+    it('drops the status filter when asked for everything', async () => {
+      await service.findBySeedId('seed-1', EvaluationScope.ALL);
+
+      expect(candidateRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { topicSeedId: 'seed-1' } }),
+      );
     });
   });
 

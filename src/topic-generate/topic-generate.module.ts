@@ -6,6 +6,10 @@ import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
 import { TopicGenerateProcessor } from './topic-generate.processor';
 import { TopicGenerateAiService } from './topic-generate-ai.service';
 import { TOPIC_GENERATE_QUEUE } from './topic-generate.constants';
+import {
+  TOPIC_EVALUATE_QUEUE,
+  TOPIC_EVALUATE_JOB_OPTIONS,
+} from '../topic-evaluate/topic-evaluate.constants';
 import { TopicSeedModule } from '../topic-seed/topic-seed.module';
 import { TopicCandidateModule } from '../topic-candidate/topic-candidate.module';
 
@@ -13,6 +17,11 @@ import { TopicCandidateModule } from '../topic-candidate/topic-candidate.module'
   imports: [
     ConfigModule,
     BullModule.registerQueue({ name: TOPIC_GENERATE_QUEUE }),
+    // Producer only - TopicEvaluateModule owns the worker for this queue
+    BullModule.registerQueue({
+      name: TOPIC_EVALUATE_QUEUE,
+      defaultJobOptions: TOPIC_EVALUATE_JOB_OPTIONS,
+    }),
     BullBoardModule.forFeature({
       name: TOPIC_GENERATE_QUEUE,
       adapter: BullMQAdapter,

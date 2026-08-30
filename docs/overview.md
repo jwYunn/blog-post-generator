@@ -15,13 +15,10 @@ Automated pipeline that turns English vocabulary/grammar seed keywords into publ
   → Claude opus-4-5 generates 10 topic candidates
   → Save TopicCandidates (status=pending)
          │
-         ▼ (manual trigger)
-[User] POST /topic-seeds/:id/evaluate
-         │
-         ▼
+         ▼ (auto-chained; POST /topic-seeds/:id/evaluate re-runs it by hand)
   [Queue] topic-evaluate
   TopicEvaluateProcessor
-  → GPT-4o scores each candidate (0–100)
+  → Scores the seed's PENDING candidates only, with GPT-4o (0–100)
   → Updates: overallScore, rank, verdict, strengths, weaknesses
          │
          ▼ (manual: pick the best candidate)
