@@ -42,7 +42,14 @@ Score each candidate from 1 to 10 for the following:
 
 6. uniqueness
 - Is this candidate meaningfully different from the others in the same input list?
+- Is it meaningfully different from the articles already covered for this seed?
 - Penalize near-duplicates or very similar angles
+- Penalize a candidate that would target the same search intent as an article
+  already covered: two posts competing for one query split their own traffic,
+  and the weaker one is what search engines drop
+- A different angle on the same word is fine when it answers a different
+  question. "How do I pronounce it" and "which one do I use" are separate
+  searches; two different phrasings of "what is the difference" are not
 
 ## Overall scoring
 Calculate:
@@ -88,6 +95,12 @@ Each item must include:
 - rank must start from 1
 - Do not wrap in markdown
 - Return raw JSON array only
+
+## Already covered for this seed
+These articles have already been written from this seed. Judge uniqueness
+against them as well as against the other candidates in the list.
+
+{{COVERED}}
 
 ## Candidates to evaluate
 {{CANDIDATES}}`;

@@ -24,7 +24,10 @@ import {
 } from './dto/update-topic-candidate-status.dto';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
-import { formatTitleWithCategory } from '../common/utils/title.util';
+import {
+  formatTitleWithCategory,
+  stripTitleCategory,
+} from '../common/utils/title.util';
 import {
   ARTICLE_OUTLINE_QUEUE,
   GENERATE_ARTICLE_OUTLINE_JOB,
@@ -322,6 +325,31 @@ export class TopicCandidateService {
       .addOrderBy('tc.overallScore', 'DESC')
       .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
       .getOne();
+  }
+
+  /**
+   * Titles this seed has already been turned into articles under.
+   *
+   * Deliberately wider than "published": the scheduler commits one candidate a
+   * day while the articles it starts sit waiting for review, so counting only
+   * live posts would let three near-identical topics be written before the
+   * first of them went up. Failed drafts are excluded - nothing was produced,
+   * so nothing is covered. The category prefix is stripped because it says
+   * nothing about whether two topics overlap.
+   */
+  async findCoveredTitlesBySeed(seedId: string): Promise<string[]> {
+    const rows = await this.draftRepository
+      .createQueryBuilder('draft')
+      .select('draft.title', 'title')
+      .innerJoin('draft.topicCandidate', 'candidate')
+      .where('candidate.topicSeedId = :seedId', { seedId })
+      .andWhere('draft.status != :failed', {
+        failed: ArticleDraftStatus.FAILED,
+      })
+      .orderBy('draft.createdAt', 'DESC')
+      .getRawMany<{ title: string }>();
+
+    return rows.map((row) => stripTitleCategory(row.title));
   }
 
   /** How many candidates the scheduler could still draw on */

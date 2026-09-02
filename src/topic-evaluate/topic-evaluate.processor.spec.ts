@@ -56,6 +56,7 @@ describe('TopicEvaluateProcessor', () => {
   beforeEach(() => {
     candidateService = {
       findBySeedId: jest.fn(async () => CANDIDATES),
+      findCoveredTitlesBySeed: jest.fn(async () => []),
       saveEvaluations: jest.fn(),
     };
     aiService = { evaluateCandidates: jest.fn(async () => EVALUATIONS) };
@@ -116,31 +117,78 @@ describe('TopicEvaluateProcessor', () => {
     });
   });
 
+  /**
+   * Judging a candidate only against its siblings lets the same search intent
+   * be covered twice, months apart - the two articles then compete for one
+   * query instead of adding up. What the seed has already produced goes to the
+   * model alongside the candidates.
+   */
+  describe('scoring against what the seed already covers', () => {
+    it('hands the model the articles this seed has produced', async () => {
+      candidateService.findCoveredTitlesBySeed.mockResolvedValue([
+        'Would vs Could 차이',
+        'Sorry와 Apologize 차이',
+      ]);
+
+      await processor.process(job);
+
+      expect(candidateService.findCoveredTitlesBySeed).toHaveBeenCalledWith(
+        SEED_ID,
+      );
+      expect(aiService.evaluateCandidates).toHaveBeenCalledWith(
+        expect.any(Array),
+        ['Would vs Could 차이', 'Sorry와 Apologize 차이'],
+      );
+    });
+
+    it('passes an empty list for a seed that has produced nothing', async () => {
+      await processor.process(job);
+
+      expect(aiService.evaluateCandidates).toHaveBeenCalledWith(
+        expect.any(Array),
+        [],
+      );
+    });
+
+    // Worth recording: it explains why a run scored the field the way it did
+    it('records how much ground the seed already covers', async () => {
+      candidateService.findCoveredTitlesBySeed.mockResolvedValue(['a', 'b']);
+
+      await processor.process(job);
+
+      expect(jobLogText()).toContain('2 article(s) already cover this seed');
+    });
+  });
+
   // The model is prompted with snake_case keys, so the mapping is part of the
   // contract rather than a detail of the caller
   it('hands the model the candidate fields it expects', async () => {
     await processor.process(job);
 
-    expect(aiService.evaluateCandidates).toHaveBeenCalledWith([
-      {
-        id: 'c1',
-        title: 'Present perfect explained',
-        primary_keyword: 'present perfect',
-        search_intent: 'informational',
-        target_reader: 'beginners',
-        why_this_topic: 'high volume',
-        outline_preview: ['a'],
-      },
-      {
-        id: 'c2',
-        title: 'What ghosting means',
-        primary_keyword: 'ghosting',
-        search_intent: 'informational',
-        target_reader: 'everyone',
-        why_this_topic: 'trending',
-        outline_preview: null,
-      },
-    ]);
+    expect(aiService.evaluateCandidates).toHaveBeenCalledWith(
+      [
+        {
+          id: 'c1',
+          title: 'Present perfect explained',
+          primary_keyword: 'present perfect',
+          search_intent: 'informational',
+          target_reader: 'beginners',
+          why_this_topic: 'high volume',
+          outline_preview: ['a'],
+        },
+        {
+          id: 'c2',
+          title: 'What ghosting means',
+          primary_keyword: 'ghosting',
+          search_intent: 'informational',
+          target_reader: 'everyone',
+          why_this_topic: 'trending',
+          outline_preview: null,
+        },
+      ],
+      // Covered titles ride alongside the candidates; this seed has none
+      [],
+    );
   });
 
   // What won and how the field split is the reason anyone opens this job

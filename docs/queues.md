@@ -68,8 +68,26 @@ ask for it, via `?scope=all`.
 ### Processor Steps
 1. Fetch the seed's `TopicCandidate` rows in `scope` (`pending` unless told otherwise)
 2. Build candidate input array with: id, title, keyword, searchIntent, targetReader, whyThisTopic, outlinePreview
-3. Call `TopicEvaluateAiService.evaluateCandidates(candidates)` → evaluation results
-4. Call `TopicCandidateService.saveEvaluations(evaluations)` → bulk update
+3. Fetch the titles this seed has already been turned into articles under
+4. Call `TopicEvaluateAiService.evaluateCandidates(candidates, coveredTitles)` → evaluation results
+5. Call `TopicCandidateService.saveEvaluations(evaluations)` → bulk update
+
+### Scoring against what the seed already covers
+
+`uniqueness` judges a candidate against the other candidates in its batch **and**
+against the articles the seed has already produced. Without the second half the
+same search intent gets covered twice, months apart, and the two posts compete
+for one query instead of adding up — the weaker one is what search engines drop.
+
+"Covered" is wider than "published" on purpose: the scheduler commits one
+candidate a day while the articles it starts sit waiting for review, so counting
+only live posts would let three near-identical topics be written before the
+first went up. Failed drafts are excluded, since nothing was produced. The
+category prefix is stripped from the titles — it says nothing about whether two
+topics overlap.
+
+A different angle on the same word is not penalised when it answers a different
+question; two phrasings of the same question are.
 
 ### Output
 Updates each `TopicCandidate` with: `overallScore`, `rank`, `strengths`, `weaknesses`, `verdict`, `evaluationDetail`.

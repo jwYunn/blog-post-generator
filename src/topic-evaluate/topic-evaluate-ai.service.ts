@@ -47,15 +47,29 @@ export class TopicEvaluateAiService {
     });
   }
 
+  /**
+   * @param coveredTitles articles already written from this seed. Scoring a
+   * candidate against them is what stops the same search intent being covered
+   * twice - the two posts would compete for one query rather than add up.
+   */
   async evaluateCandidates(
     candidates: CandidateInput[],
+    coveredTitles: string[] = [],
   ): Promise<EvaluationPayload[]> {
+    const covered =
+      coveredTitles.length > 0
+        ? coveredTitles.map((title) => `- ${title}`).join('\n')
+        : 'Nothing has been written from this seed yet.';
+
     const prompt = TOPIC_EVALUATE_PROMPT.replace(
       '{{CANDIDATES}}',
       JSON.stringify(candidates, null, 2),
-    );
+    ).replace('{{COVERED}}', covered);
 
-    this.logger.log(`Calling GPT to evaluate ${candidates.length} candidates`);
+    this.logger.log(
+      `Calling GPT to evaluate ${candidates.length} candidates ` +
+        `against ${coveredTitles.length} already covered`,
+    );
 
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o',

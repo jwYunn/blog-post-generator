@@ -70,9 +70,18 @@ export class TopicEvaluateProcessor extends WorkerHost {
         outline_preview: c.outlinePreview,
       }));
 
+      // Scored against what this seed has already produced, so a candidate
+      // that would chase the same query as an existing article is marked down
+      // rather than picked up later as if it were new ground
+      const covered =
+        await this.topicCandidateService.findCoveredTitlesBySeed(seedId);
+      await jobLog(job, `${covered.length} article(s) already cover this seed`);
+
       await jobStep(job, 20, 'calling gpt-4o to score candidates');
-      const evaluations =
-        await this.topicEvaluateAiService.evaluateCandidates(candidateInputs);
+      const evaluations = await this.topicEvaluateAiService.evaluateCandidates(
+        candidateInputs,
+        covered,
+      );
       await jobStep(job, 80, `model scored ${evaluations.length} candidates`);
 
       // The reason anyone opens this job is to see what won and how the field
