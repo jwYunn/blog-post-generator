@@ -13,6 +13,7 @@ All queues use **BullMQ** backed by Redis. The Bull Board dashboard is available
 | `article-thumbnail` | `generate-article-thumbnail` | `ArticleThumbnailProcessor` | 1 | Auto-chained after content |
 | `article-publish` | `publish-article` | `ArticlePublishProcessor` | 1 | `POST /article-drafts/:id/publish` |
 | `thumbnail-generator` | `generate-thumbnail` | `ThumbnailGeneratorProcessor` | 2 | `POST /thumbnail-generator/generate` |
+| `pipeline-scheduler` | `daily-pipeline-run` | `PipelineSchedulerProcessor` | 1 | Repeatable schedule, or `POST /pipeline-scheduler/run` |
 
 ---
 
@@ -220,6 +221,63 @@ The `ArticlePublishRecord` is created by `ArticlePublishService.addPublishJob`
 
 ### Output
 Creates `Thumbnail` rows and `ThumbnailPromptMapping` rows linking the prompt to each generated image.
+
+---
+
+## pipeline-scheduler
+
+**Queue**: `pipeline-scheduler`
+**Job**: `daily-pipeline-run`
+
+Registered as a BullMQ job scheduler on every boot, defaulting to `0 5 * * *` in
+`Asia/Seoul`. Registration is an upsert under a fixed id, so changing the cron
+replaces the schedule rather than leaving two of them firing. Jobs here are kept
+for 90 days rather than the usual 7: at one run a day they are the record of what
+the pipeline chose while nobody was watching.
+
+### Payload
+```typescript
+{
+  manual?: boolean   // set when a person triggered the run
+}
+```
+
+### Processor Steps
+1. Read the settings (`PIPELINE_*` env, see below)
+2. For each article the settings allow: take the highest-scoring **pending**
+   candidate at or above `PIPELINE_MIN_SCORE` and approve it — approval creates
+   the draft and enqueues `article-outline`, so the article writes itself from
+   there and the run does not wait for it
+3. Count what is left in the pool
+4. If the pool is below `POOL_LOW_WATER_MARK`, top it up: enqueue
+   `topic-evaluate` for a seed holding unscored candidates, or `topic-generate`
+   for the next seed in rotation when no such backlog is left
+
+### Why it draws from the pool
+
+Generation returns ten candidates and a run consumes one, so generating every
+morning would grow the backlog by nine a day. Drawing from what is already
+scored keeps a run cheap — most days it costs nothing but a few queries — and
+tops up only when the pool actually thins.
+
+### Which candidate gets picked
+
+Highest score wins, but seeds that produced an article in the last seven days
+are ranked below those that did not. Candidates from one seed are all scored in
+the same run and cluster around the same number, so score alone would let a
+single seed supply several days running — repetitive to read, and those articles
+would compete with each other for the same query. The rest breaks towards the
+least recently used seed. It is an ordering, not a filter: a pool made entirely
+of recent seeds still yields its best candidate.
+
+### Settings
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `PIPELINE_SCHEDULE_CRON` | `0 5 * * *` | When the run fires |
+| `PIPELINE_SCHEDULE_TZ` | `Asia/Seoul` | Container clocks are UTC, so this matters |
+| `PIPELINE_MIN_SCORE` | `7` | Out of 10. Below it, nothing is written |
+| `PIPELINE_DAILY_ARTICLES` | `1` | Articles started per run |
 
 ---
 

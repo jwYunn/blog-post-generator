@@ -182,6 +182,19 @@ export class TopicSeedService {
   }
 
   // Used by BullMQ jobs: increments usage count and updates last used timestamp
+  /**
+   * Next seed in the rotation: highest priority first, then whichever has gone
+   * longest without being used. Seeds never used at all come first.
+   */
+  async findNextForGeneration(): Promise<TopicSeedEntity | null> {
+    return this.topicSeedRepository
+      .createQueryBuilder('seed')
+      .where('seed.isActive = true')
+      .orderBy('seed.priority', 'DESC')
+      .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
+      .getOne();
+  }
+
   async incrementUsedCount(id: string): Promise<void> {
     await this.topicSeedRepository
       .createQueryBuilder()

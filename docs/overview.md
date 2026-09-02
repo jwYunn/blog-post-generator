@@ -95,6 +95,7 @@ Independent pipeline for generating custom thumbnails via Replicate (not tied to
 | `article-publish` | Queue processor; Playwright Tistory automation |
 | `thumbnail-generator` | Independent prompt-based image generation via Replicate |
 | `api-source` | Simple CRUD for tracking external API usage sources |
+| `pipeline-scheduler` | Daily run: picks a scored candidate, starts its article, tops the pool up |
 
 ## Entity Relationship Summary
 

@@ -10,6 +10,9 @@ import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
 import { EvaluationScope } from './enums/evaluation-scope.enum';
+
+/** Days a seed rests after one of its candidates became an article */
+const SEED_COOLDOWN_DAYS = 7;
 import {
   QueryTopicCandidateListDto,
   CandidateSortBy,
@@ -282,6 +285,77 @@ export class TopicCandidateService {
       },
       order: { createdAt: 'ASC' },
     });
+  }
+
+  /**
+   * Highest-scoring candidate still awaiting a decision, at or above
+   * `minScore`, preferring seeds that have not produced an article recently.
+   *
+   * Score alone would let one seed supply several days in a row - its
+   * candidates were all scored in the same run, so they cluster near the same
+   * number. Beyond looking repetitive, those articles would target nearly the
+   * same query and compete with each other. The preference is an ordering
+   * rather than a filter, so a pool made entirely of recent seeds still yields
+   * its best candidate instead of nothing.
+   */
+  async findBestPending(
+    minScore: number,
+    cooldownDays = SEED_COOLDOWN_DAYS,
+  ): Promise<TopicCandidateEntity | null> {
+    const seedUsedRecently = `EXISTS (
+      SELECT 1
+      FROM article_drafts d
+      JOIN topic_candidates sibling ON sibling.id = d."topicCandidateId"
+      WHERE sibling."topicSeedId" = seed.id
+        AND d."createdAt" > NOW() - (:cooldownDays * INTERVAL '1 day')
+    )`;
+
+    return this.candidateRepository
+      .createQueryBuilder('tc')
+      .innerJoinAndSelect('tc.topicSeed', 'seed')
+      .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
+      .andWhere('tc.overallScore >= :minScore', { minScore })
+      .andWhere('seed.isActive = true')
+      .andWhere('seed.deletedAt IS NULL')
+      .setParameter('cooldownDays', cooldownDays)
+      .orderBy(seedUsedRecently, 'ASC')
+      .addOrderBy('tc.overallScore', 'DESC')
+      .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
+      .getOne();
+  }
+
+  /** How many candidates the scheduler could still draw on */
+  async countPendingAtOrAbove(minScore: number): Promise<number> {
+    return this.candidateRepository
+      .createQueryBuilder('tc')
+      .innerJoin('tc.topicSeed', 'seed')
+      .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
+      .andWhere('tc.overallScore >= :minScore', { minScore })
+      .andWhere('seed.isActive = true')
+      .andWhere('seed.deletedAt IS NULL')
+      .getCount();
+  }
+
+  /**
+   * A seed holding pending candidates that were never scored, largest backlog
+   * first. Scoring these is far cheaper than generating new ones, so the
+   * scheduler drains this before it asks for more candidates.
+   */
+  async findSeedWithUnscoredPending(): Promise<string | null> {
+    const row = await this.candidateRepository
+      .createQueryBuilder('tc')
+      .select('tc.topicSeedId', 'seedId')
+      .innerJoin('tc.topicSeed', 'seed')
+      .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
+      .andWhere('tc.overallScore IS NULL')
+      .andWhere('seed.isActive = true')
+      .andWhere('seed.deletedAt IS NULL')
+      .groupBy('tc.topicSeedId')
+      .orderBy('COUNT(tc.id)', 'DESC')
+      .limit(1)
+      .getRawOne<{ seedId: string }>();
+
+    return row?.seedId ?? null;
   }
 
   async saveEvaluations(evaluations: EvaluationPayload[]): Promise<void> {

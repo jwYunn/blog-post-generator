@@ -295,6 +295,36 @@ Delete a source (hard delete).
 
 ## Thumbnail Generator
 
+## Pipeline Scheduler
+
+### GET /pipeline-scheduler/schedule
+What the daily run is configured to do, and when it fires next. The next-run
+time is resolved from the live schedule, which is the way to confirm the
+timezone is being applied.
+
+**Response** `200`
+```typescript
+{
+  cron: string
+  timezone: string
+  minScore: number
+  dailyArticles: number
+  nextRunAt: string | null   // ISO 8601, null if the schedule is not registered
+}
+```
+
+### POST /pipeline-scheduler/run
+Run the daily job now, on the same path the schedule uses.
+
+**Response** `202`
+```typescript
+{
+  jobId: string
+}
+```
+
+---
+
 ### POST /thumbnail-generator/generate
 Create a prompt and enqueue image generation.
 
