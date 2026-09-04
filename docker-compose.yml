@@ -71,9 +71,12 @@ services:
 
   app:
     image: ${APP_IMAGE:-blog-post-generator:latest}
-    # Lets a checkout build its own image, locally or on the server before CI
-    # exists. Once the pipeline runs, APP_IMAGE points at the GHCR tag and this
-    # is never used - `up` prefers the named image when it is already present.
+    # The fallback lets a checkout build and run its own image, which is what
+    # local development uses. On the server it is a trap: `docker compose up -d
+    # app` with APP_IMAGE unset quietly starts whatever was last built by hand
+    # there instead of the deployed build, and nothing says so. The deploy
+    # writes APP_IMAGE into the server's .env to keep the bare command honest,
+    # and fails if the container it ends up with is not the one it pushed.
     build: .
     container_name: blog-generator-app
     logging: *default-logging

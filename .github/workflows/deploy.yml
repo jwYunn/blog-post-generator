@@ -135,6 +135,18 @@ jobs:
             export APP_IMAGE
             echo "Deploying $APP_IMAGE"
 
+            # Pin the image in .env as well. compose falls back to a local
+            # `blog-post-generator:latest` when APP_IMAGE is unset, so a manual
+            # `docker compose up -d app` on the server - to pick up an edited
+            # .env, say - silently reverted the app to whatever was last built
+            # by hand there. Recording it here means the bare command uses this
+            # deploy's build; the exported variable still wins for this run.
+            if grep -q '^APP_IMAGE=' .env; then
+              sed -i.bak "s|^APP_IMAGE=.*|APP_IMAGE=${APP_IMAGE}|" .env && rm -f .env.bak
+            else
+              printf '\n# Written by the deploy so a bare `docker compose up` uses this build\nAPP_IMAGE=%s\n' "${APP_IMAGE}" >> .env
+            fi
+
             docker compose pull app
 
             # No --no-deps: it would skip the service_healthy conditions, and
@@ -156,6 +168,16 @@ jobs:
               docker compose logs --tail=80 app
               exit 1
             fi
+
+            # The healthy container is not necessarily the one just deployed:
+            # anything that resolved APP_IMAGE differently would leave an older
+            # build running and reporting itself healthy.
+            RUNNING=$(docker inspect -f '{{.Config.Image}}' blog-generator-app)
+            if [ "$RUNNING" != "$APP_IMAGE" ]; then
+              echo "app is running $RUNNING, expected $APP_IMAGE"
+              exit 1
+            fi
+            echo "Running $RUNNING"
 
             # nginx keeps whatever config it read at startup. That config arrives
             # as a bind mount, so compose sees no change to the service and

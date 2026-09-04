@@ -218,6 +218,17 @@ APP_IMAGE=ghcr.io/jwyunn/blog-post-generator:sha-abc1234 docker compose up -d ap
 Run it from `DEPLOY_PATH` on the server. Compose recreates only `app`; the other
 services keep running.
 
+Every deploy also writes its `APP_IMAGE` into the server's `.env`, so a bare
+`docker compose up -d app` — restarting to pick up an edited `.env`, say — starts
+the deployed build. Without that pin compose falls back to
+`blog-post-generator:latest`, a local tag left behind by an earlier hand-built
+image, and the app quietly reverts by however many deploys have happened since.
+Nothing in the output says so. Overriding `APP_IMAGE` on the command line still
+wins, which is what makes the rollback above work.
+
+Because the pin lives in `.env`, a rollback done this way lasts only until the
+next `up` — set `APP_IMAGE` in `.env` too if it needs to survive one.
+
 > [!WARNING]
 > **Migrations do not roll back with the image.** Reverting to an older image
 > leaves the database on the newer schema, and the older code has no idea the
