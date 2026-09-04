@@ -20,10 +20,10 @@ export const PIPELINE_SCHEDULER_JOB_OPTIONS: JobsOptions = {
   removeOnFail: { age: 7_776_000 },
 };
 
-/** 05:00, every day */
-export const DEFAULT_SCHEDULE_CRON = '0 5 * * *';
+/** 21:00, every day - late enough that the article is waiting after work */
+export const DEFAULT_SCHEDULE_CRON = '0 21 * * *';
 
-/** The server runs on UTC; the schedule is meant in the author's own morning */
+/** The server runs on UTC; the schedule is meant in the author's own evening */
 export const DEFAULT_SCHEDULE_TZ = 'Asia/Seoul';
 
 /** Only candidates scoring at least this much are written up unattended */

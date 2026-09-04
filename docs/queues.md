@@ -247,7 +247,7 @@ Creates `Thumbnail` rows and `ThumbnailPromptMapping` rows linking the prompt to
 **Queue**: `pipeline-scheduler`
 **Job**: `daily-pipeline-run`
 
-Registered as a BullMQ job scheduler on every boot, defaulting to `0 5 * * *` in
+Registered as a BullMQ job scheduler on every boot, defaulting to `0 21 * * *` in
 `Asia/Seoul`. Registration is an upsert under a fixed id, so changing the cron
 replaces the schedule rather than leaving two of them firing. Jobs here are kept
 for 90 days rather than the usual 7: at one run a day they are the record of what
@@ -274,7 +274,7 @@ the pipeline chose while nobody was watching.
 ### Why it draws from the pool
 
 Generation returns ten candidates and a run consumes one, so generating every
-morning would grow the backlog by nine a day. Drawing from what is already
+run would grow the backlog by nine a day. Drawing from what is already
 scored keeps a run cheap — most days it costs nothing but a few queries — and
 tops up only when the pool actually thins.
 
@@ -292,7 +292,7 @@ of recent seeds still yields its best candidate.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PIPELINE_SCHEDULE_CRON` | `0 5 * * *` | When the run fires |
+| `PIPELINE_SCHEDULE_CRON` | `0 21 * * *` | When the run fires |
 | `PIPELINE_SCHEDULE_TZ` | `Asia/Seoul` | Container clocks are UTC, so this matters |
 | `PIPELINE_MIN_SCORE` | `7` | Out of 10. Below it, nothing is written |
 | `PIPELINE_DAILY_ARTICLES` | `1` | Articles started per run |

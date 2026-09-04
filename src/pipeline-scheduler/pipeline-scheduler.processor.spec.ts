@@ -37,7 +37,7 @@ describe('PipelineSchedulerProcessor', () => {
   beforeEach(() => {
     schedulerService = {
       settings: jest.fn(() => ({
-        cron: '0 5 * * *',
+        cron: '0 21 * * *',
         timezone: 'Asia/Seoul',
         minScore: 7,
         dailyArticles: 1,
@@ -98,7 +98,7 @@ describe('PipelineSchedulerProcessor', () => {
 
     it('starts as many articles as the settings allow', async () => {
       schedulerService.settings.mockReturnValue({
-        cron: '0 5 * * *',
+        cron: '0 21 * * *',
         timezone: 'Asia/Seoul',
         minScore: 7,
         dailyArticles: 3,
@@ -124,7 +124,7 @@ describe('PipelineSchedulerProcessor', () => {
 
     it('stops early rather than reaching for a weaker candidate', async () => {
       schedulerService.settings.mockReturnValue({
-        cron: '0 5 * * *',
+        cron: '0 21 * * *',
         timezone: 'Asia/Seoul',
         minScore: 7,
         dailyArticles: 3,

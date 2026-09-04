@@ -29,7 +29,7 @@ interface DailyRunPayload {
  * One run a day: take the best candidate already sitting in the pool and let
  * the article pipeline write it up, then top the pool up if it is running thin.
  *
- * Drawing from the pool rather than generating fresh candidates each morning is
+ * Drawing from the pool rather than generating fresh candidates on every run is
  * deliberate. Generation returns ten candidates and a run consumes one, so
  * generating daily would grow the backlog by nine a day - which is how the 97
  * unscored candidates already in the table came to be there.
