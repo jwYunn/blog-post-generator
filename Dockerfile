@@ -30,8 +30,17 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Carries the compiled output plus the thumbnail fonts and templates that
-# nest-cli copies in as assets
+# Sharp draws the thumbnail's title through librsvg, which resolves fonts only
+# through fontconfig - it ignores an @font-face carrying the font inline, which
+# is what this used to rely on. alpine ships no fonts at all, so every glyph came
+# out as a missing-glyph box. Installing the font system-wide is what makes
+# font-family="Black Han Sans" resolve to anything.
+RUN apk add --no-cache fontconfig
+COPY src/article-thumbnail/fonts/BlackHanSans-Regular.ttf /usr/share/fonts/
+RUN fc-cache -f
+
+# Carries the compiled output plus the thumbnail templates that nest-cli copies
+# in as assets
 COPY --from=builder --chown=node:node /app/dist ./dist
 
 USER node

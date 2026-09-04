@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import axios from 'axios';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 import * as sharp from 'sharp';
 
 interface TextZone {
@@ -14,11 +15,20 @@ interface TemplateConfig {
   textZone: TextZone;
 }
 
-const S3_BASE =
-  'https://blog-assets-441964862929-ap-northeast-2-an.s3.ap-northeast-2.amazonaws.com/templates';
+/**
+ * Templates ship with the build (nest-cli copies them next to the compiled
+ * service). They used to be fetched from S3 on boot, which made the app's
+ * startup depend on a bucket for two files it already carried.
+ */
+const TEMPLATE_DIR = join(__dirname, 'templates');
 
-const FONT_URL =
-  'https://fonts.gstatic.com/s/blackhansans/v17/ea8Aad44WunzF9a-dL6toA8r8nqVIXSkH-Hc.ttf';
+/**
+ * The font's own family name, which is what fontconfig will answer to. It is
+ * installed into the image rather than embedded in the SVG: librsvg resolves
+ * fonts only through fontconfig and ignores an @font-face that carries the font
+ * inline, so the embedded copy this used to build was never once used.
+ */
+const FONT_FAMILY = 'Black Han Sans';
 
 const TEMPLATES: TemplateConfig[] = [
   {
@@ -33,23 +43,18 @@ const TEMPLATES: TemplateConfig[] = [
 
 @Injectable()
 export class ThumbnailImageProcessingService implements OnModuleInit {
-  private fontBase64: string;
   private templateBuffers: Map<string, Buffer> = new Map();
 
+  /**
+   * Read once at boot rather than per thumbnail. Failing here is deliberate: a
+   * missing template is a broken build, and finding that out on the first
+   * article of the day is worse than finding it out on deploy.
+   */
   async onModuleInit(): Promise<void> {
-    // Download font and encode to base64 (runs once on module init)
-    const fontRes = await axios.get<ArrayBuffer>(FONT_URL, {
-      responseType: 'arraybuffer',
-    });
-    this.fontBase64 = Buffer.from(fontRes.data).toString('base64');
-
-    // Download template images and cache in memory (runs once on module init)
     await Promise.all(
       TEMPLATES.map(async (tpl) => {
-        const res = await axios.get<ArrayBuffer>(`${S3_BASE}/${tpl.filename}`, {
-          responseType: 'arraybuffer',
-        });
-        this.templateBuffers.set(tpl.filename, Buffer.from(res.data));
+        const buffer = await readFile(join(TEMPLATE_DIR, tpl.filename));
+        this.templateBuffers.set(tpl.filename, buffer);
       }),
     );
   }
@@ -185,21 +190,11 @@ export class ThumbnailImageProcessingService implements OnModuleInit {
       .map((line, i) => {
         const y = Math.round(blockStartY + i * lineHeight);
         const safeText = this.escapeSvgText(line);
-        return `<text x="${zone.centerX}" y="${y}" font-family="BlackHanSans" font-size="${fontSize}" fill="white" stroke="rgba(0,0,0,0.55)" stroke-width="${Math.max(2, Math.round(fontSize * 0.05))}" paint-order="stroke" text-anchor="middle">${safeText}</text>`;
+        return `<text x="${zone.centerX}" y="${y}" font-family="${FONT_FAMILY}" font-size="${fontSize}" fill="white" stroke="rgba(0,0,0,0.55)" stroke-width="${Math.max(2, Math.round(fontSize * 0.05))}" paint-order="stroke" text-anchor="middle">${safeText}</text>`;
       })
       .join('\n  ');
 
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1152" height="896">
-  <defs>
-    <style>
-      @font-face {
-        font-family: 'BlackHanSans';
-        src: url('data:font/truetype;base64,${this.fontBase64}') format('truetype');
-        font-weight: normal;
-        font-style: normal;
-      }
-    </style>
-  </defs>
   ${textElements}
 </svg>`;
 
