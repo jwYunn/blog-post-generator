@@ -10,6 +10,20 @@ const CATEGORY_TAGS: ReadonlySet<string> = new Set(
   Object.values(TopicSeedCategory).map((category) => categoryLabel(category)),
 );
 
+/**
+ * Whether a string carries any Hangul at all.
+ *
+ * Readers of this blog search in Korean, so a title without a Korean word in it
+ * cannot be found by the people it is written for. "Customer vs Custom: Why ESL
+ * Learners Confuse These Words" reached review with 9/10 for SEO title quality
+ * and was unreachable by its own audience. English inside a Korean title is
+ * normal and wanted - "prefer to do vs prefer doing: 언제 to부정사" is the shape
+ * that works - which is why this asks for any Hangul rather than a proportion.
+ */
+export function containsKorean(text: string): boolean {
+  return /[\uAC00-\uD7A3\u3131-\u318E]/.test(text);
+}
+
 export function formatTitleWithCategory(
   category: string,
   title: string,

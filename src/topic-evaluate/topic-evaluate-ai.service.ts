@@ -16,6 +16,7 @@ interface CandidateInput {
 }
 
 interface EvaluationDetail extends Record<string, number> {
+  search_demand: number;
   search_intent_clarity: number;
   topic_specificity: number;
   seo_title_quality: number;

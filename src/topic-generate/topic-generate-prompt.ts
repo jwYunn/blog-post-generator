@@ -6,7 +6,14 @@ Your goal is to generate high-quality blog topic candidates.
 {{USER_INPUT}}
 
 ## Requirements
-- Generate 10 diverse candidates
+- Generate up to 10 candidates
+- **Return fewer when the input does not support more.** Some inputs carry one
+  real question and no more; padding the list means inventing situations nobody
+  searches for. Four candidates a learner would actually type beat ten that read
+  well. This is the single most important rule here
+- Every title must be written in Korean. English words belong inside it - the
+  expression being taught, grammar terms - but a title with no Korean in it
+  cannot be found by the readers it is for
 - Each candidate must target a clear and specific search intent
 - Avoid duplicates or very similar topics
 - Avoid topics that are too broad (e.g. "learn English", "English grammar")
@@ -25,5 +32,8 @@ Each item must include:
 ## Important
 - Be specific, not generic
 - Each topic should be able to become a standalone blog post
-- Make the topics varied in angle and type
+- Vary the angle only as far as the input genuinely supports. Ask of each
+  candidate: would a Korean learner type this into a search box? Attaching an
+  expression to a setting that happens to sound useful - a diary, a business
+  email, an exam - is not an angle if nobody searches for the combination
 - Return a raw JSON array only, no markdown code blocks`;

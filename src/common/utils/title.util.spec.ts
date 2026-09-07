@@ -1,5 +1,46 @@
 import { TopicSeedCategory } from '../../topic-seed/enums/topic-seed-category.enum';
-import { formatTitleWithCategory, stripTitleCategory } from './title.util';
+import {
+  containsKorean,
+  formatTitleWithCategory,
+  stripTitleCategory,
+} from './title.util';
+
+/**
+ * The gate on titles the blog's own readers could never search for. It asks for
+ * any Hangul rather than a proportion of it, because the titles that work are
+ * mostly a Korean sentence wrapped around English being taught.
+ */
+describe('containsKorean', () => {
+  it('accepts a Korean title', () => {
+    expect(containsKorean('영어 회의에서 반대 의견 말하는 표현')).toBe(true);
+  });
+
+  it('accepts the mixed shape the good titles actually take', () => {
+    expect(
+      containsKorean('prefer to do vs prefer doing: 언제 to부정사를 쓸까'),
+    ).toBe(true);
+  });
+
+  // The title that reached review at 9/10 for SEO quality, unreachable by the
+  // people it was written for
+  it('rejects a title written entirely in English', () => {
+    expect(
+      containsKorean(
+        'Customer vs Custom: Why ESL Learners Confuse These Words',
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a title carrying no letters at all', () => {
+    expect(containsKorean('')).toBe(false);
+    expect(containsKorean('2026 :: !!')).toBe(false);
+  });
+
+  // Jamo on their own are still Korean - "ㅋㅋ", "ㅠㅠ" turn up in titles
+  it('counts standalone jamo', () => {
+    expect(containsKorean('English humour and ㅋㅋ')).toBe(true);
+  });
+});
 
 describe('formatTitleWithCategory', () => {
   it('capitalises the category and prefixes the title with it', () => {

@@ -44,7 +44,12 @@ describe('TopicGenerateProcessor', () => {
     candidateService = {
       saveMany: jest.fn(async () => ({ saved: 2, skipped: 0 })),
     };
-    aiService = { generateCandidates: jest.fn(async () => CANDIDATES) };
+    aiService = {
+      generateCandidates: jest.fn(async () => ({
+        candidates: CANDIDATES,
+        droppedNonKorean: 0,
+      })),
+    };
     evaluateQueue = { add: jest.fn(async () => ({ id: 42 })) };
     job = buildJob();
 
@@ -63,6 +68,23 @@ describe('TopicGenerateProcessor', () => {
       'present perfect',
     );
     expect(candidateService.saveMany).toHaveBeenCalledWith(SEED_ID, CANDIDATES);
+  });
+
+  /**
+   * A title with no Korean cannot be found by the readers this blog is for, so
+   * the model's output is filtered before it reaches the table. The count is
+   * recorded because a non-zero one means the prompt is being ignored.
+   */
+  it('reports how many candidates the language filter removed', async () => {
+    aiService.generateCandidates.mockResolvedValue({
+      candidates: CANDIDATES,
+      droppedNonKorean: 3,
+    });
+
+    await processor.process(job);
+
+    expect(jobLogText()).toContain('model returned 5 candidates');
+    expect(jobLogText()).toContain('3 dropped for having no Korean title');
   });
 
   it('counts the seed as used', async () => {

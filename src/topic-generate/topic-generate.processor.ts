@@ -52,10 +52,14 @@ export class TopicGenerateProcessor extends WorkerHost {
       );
 
       await jobStep(job, 20, 'calling claude-opus-4-5 for candidates');
-      const candidates = await this.topicGenerateAiService.generateCandidates(
-        seed.seed,
+      const { candidates, droppedNonKorean } =
+        await this.topicGenerateAiService.generateCandidates(seed.seed);
+      await jobStep(
+        job,
+        70,
+        `model returned ${candidates.length + droppedNonKorean} candidates, ` +
+          `${droppedNonKorean} dropped for having no Korean title`,
       );
-      await jobStep(job, 70, `model returned ${candidates.length} candidates`);
 
       const { saved, skipped } = await this.topicCandidateService.saveMany(
         seedId,

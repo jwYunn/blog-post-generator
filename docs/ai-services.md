@@ -28,10 +28,18 @@ seedText: string  // e.g. "custom vs customs"
 **Prompt template** (`TOPIC_GENERATE_PROMPT`): Substitutes `{{USER_INPUT}}` with seedText.
 
 **Prompt instructions**:
-- Generate exactly 10 distinct topic candidates
+- Generate **up to** 10 distinct topic candidates, and fewer when the seed does
+  not support more. Asking for ten from a seed carrying one real question is
+  what produced angles like "<expression> for your English diary" — specific,
+  well written, and searched by nobody
 - Each candidate targets Korean English learners searching on Google
 - Title must be in Korean (SEO-friendly)
 - Output strict JSON array (no markdown fences)
+
+Titles with no Korean in them are dropped in `TopicGenerateAiService` rather than
+left for the evaluation to mark down: a title this blog's readers cannot search
+is unusable, not merely weaker. The processor records how many were dropped,
+since a non-zero count means the prompt is being ignored.
 
 **Output** — parsed JSON array:
 ```typescript
@@ -69,15 +77,41 @@ Array<{
 }>
 ```
 
-**Prompt template** (`TOPIC_EVALUATE_PROMPT`): Substitutes `{{CANDIDATES}}` with JSON-serialized candidates.
+**Prompt template** (`TOPIC_EVALUATE_PROMPT`): Substitutes `{{CANDIDATES}}` with
+JSON-serialized candidates and `{{COVERED}}` with the titles this seed has
+already been turned into articles under.
 
-**Evaluation criteria** (each scored 0–10):
-- `search_intent_clarity` — how well the topic matches a specific search query
-- `topic_specificity` — narrow enough to rank; avoids vague broad terms
-- `seo_title_quality` — title click-worthiness and keyword placement
-- `practical_value` — useful / actionable content for learners
-- `outline_feasibility` — can be written as a complete 2000-char article
-- `uniqueness` — differentiated from generic content
+**Evaluation criteria** (each scored 1–10, weights in brackets):
+- `search_demand` **[0.30]** — would a learner actually type this into a search
+  box? Judged separately from whether the topic is useful
+- `search_intent_clarity` [0.15] — how well the topic matches a specific search query
+- `topic_specificity` [0.15] — narrow enough to rank; avoids vague broad terms
+- `seo_title_quality` [0.15] — title click-worthiness and keyword placement; a
+  title with no Korean in it scores 1
+- `practical_value` [0.15] — useful / actionable content for learners
+- `outline_feasibility` [0.05] — can be written as a complete 2000-char article
+- `uniqueness` [0.05] — differentiated from the batch and from what the seed has
+  already covered
+
+### Why search_demand carries the most weight
+
+Every other criterion judges the topic *as described* — is it clear, is it
+narrow, is it useful. A candidate can score well on all of them and still be one
+nobody searches for, and that is what a run started producing once the scheduler
+took over topic selection from a human.
+
+The seed `just like that` returned ten angles — practising speaking rhythm,
+using it in an English diary, in a business email, in IELTS — every one of them
+scoring 7.0 or better, and not one of them a phrase anybody types. The top of
+that batch reached review with 8.4 and no weaknesses recorded. Nothing in the
+rubric asked the only question that mattered.
+
+The rubric was built to *rank* a batch, and the scheduler uses it to *gatekeep*.
+Rank 1 of ten inventions is still an invention, so the prompt now anchors
+`search_demand` against how people search, calls for the low end of the scale to
+be used, and makes a score of 5 or below a `drop` regardless of the rest.
+
+**Output** — parsed JSON array:
 
 **Output** — parsed JSON array:
 ```typescript
@@ -86,6 +120,7 @@ Array<{
   overall_score: number       // weighted average, e.g. 8.9
   rank: number                // 1 = best
   evaluation: {
+    search_demand: number
     search_intent_clarity: number
     topic_specificity: number
     seo_title_quality: number
