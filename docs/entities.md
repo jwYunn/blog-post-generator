@@ -237,6 +237,39 @@ Join table linking prompts to their generated images. Tracks which image is sele
 
 ---
 
+## search_console_queries
+
+One query/page pair as Search Console reported it over a window, stored once per
+sync. Collected by `search-console-sync`; nothing reads it into the pipeline yet.
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `id` | UUID | PK | |
+| `query` | VARCHAR(200) | NOT NULL | As typed by the searcher |
+| `normalizedQuery` | VARCHAR(200) | NOT NULL | Lowercased, spaces collapsed |
+| `page` | VARCHAR(500) | NOT NULL | The article that surfaced |
+| `windowStart` | DATE | NOT NULL | |
+| `windowEnd` | DATE | NOT NULL | Also the sync's identity |
+| `clicks` | INT | NOT NULL | |
+| `impressions` | INT | NOT NULL | |
+| `ctr` | NUMERIC(6,4) | NOT NULL | 0–1 |
+| `position` | NUMERIC(5,2) | NOT NULL | Average result position; 1.0 is the top |
+| `topicSeedId` | UUID | FK → topic_seeds, NULLABLE, ON DELETE SET NULL | Null where no seed matched |
+| `createdAt` | TIMESTAMPTZ | NOT NULL | Auto |
+
+**Indexes**
+
+| Index | Purpose |
+|---|---|
+| `("normalizedQuery", page, "windowEnd")` UNIQUE | Makes a same-day re-sync an update, not a duplicate |
+| `("windowEnd", position)` | Every read is "newest window, filtered by position" |
+| `("topicSeedId")` | Rows for one seed |
+
+`SET NULL` rather than `CASCADE`: deleting a seed must not erase the record of
+what people were searching for while it existed.
+
+---
+
 ## Migration History
 
 | Timestamp | Migration | Change |
@@ -254,3 +287,4 @@ Join table linking prompts to their generated images. Tracks which image is sele
 | 1774396800000 | CreateApiSourcesTable | Create `api_sources` |
 | 1774483200000 | CreateThumbnailGeneratorTables | Create `thumbnail_prompts`, `thumbnails`, `thumbnail_prompt_mappings` |
 | 1774569600000 | AddPublishAttemptTrackingToPublishRecords | Add `status`, `blogName` to `article_publish_records` |
+| 1774656000000 | CreateSearchConsoleQueriesTable | Create `search_console_queries` |

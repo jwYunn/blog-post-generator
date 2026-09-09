@@ -17,6 +17,7 @@ import { ApiSourceModule } from './api-source/api-source.module';
 import { ThumbnailGeneratorModule } from './thumbnail-generator/thumbnail-generator.module';
 import { HealthModule } from './health/health.module';
 import { PipelineSchedulerModule } from './pipeline-scheduler/pipeline-scheduler.module';
+import { SearchConsoleModule } from './search-console/search-console.module';
 import { validateEnv } from './config/env.validation';
 
 @Module({
@@ -60,6 +61,7 @@ import { validateEnv } from './config/env.validation';
     ApiSourceModule,
     ThumbnailGeneratorModule,
     PipelineSchedulerModule,
+    SearchConsoleModule,
     HealthModule,
   ],
 })

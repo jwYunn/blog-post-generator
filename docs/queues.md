@@ -14,6 +14,7 @@ All queues use **BullMQ** backed by Redis. The Bull Board dashboard is available
 | `article-publish` | `publish-article` | `ArticlePublishProcessor` | 1 | `POST /article-drafts/:id/publish` |
 | `thumbnail-generator` | `generate-thumbnail` | `ThumbnailGeneratorProcessor` | 2 | `POST /thumbnail-generator/generate` |
 | `pipeline-scheduler` | `daily-pipeline-run` | `PipelineSchedulerProcessor` | 1 | Repeatable schedule, or `POST /pipeline-scheduler/run` |
+| `search-console-sync` | `sync-search-console` | `SearchConsoleProcessor` | 1 | Repeatable schedule, or `POST /search-console/sync` |
 
 ---
 
@@ -327,3 +328,82 @@ and returns, at the cost of one query.
 
 `POST /topic-seeds/:id/evaluate` stays for re-running an evaluation without
 regenerating — and is the only way to pass `scope=all`.
+
+---
+
+## search-console-sync
+
+**Queue**: `search-console-sync`
+**Job**: `sync-search-console`
+
+Registered as a BullMQ job scheduler on every boot, defaulting to `0 20 * * *` in
+`Asia/Seoul` — an hour ahead of the pipeline run. Jobs are kept for 90 days, for
+the same reason as the pipeline scheduler's.
+
+Collection only. Nothing here changes what gets written or in what order; the
+data exists so that a later stage can make that decision against something
+real.
+
+### Payload
+```typescript
+{
+  manual?: boolean   // set when a person triggered the run
+}
+```
+
+### Processor Steps
+1. Return early if `GSC_SITE_URL` or `GSC_SERVICE_ACCOUNT_JSON` is unset —
+   saying so on the job, because a run that does nothing still succeeds
+2. Compute the window: `lookbackDays` ending `DATA_LAG_DAYS` ago
+3. `POST searchAnalytics.query` with dimensions `query, page`
+4. Upsert the rows onto `(normalizedQuery, page, windowEnd)`
+5. Link each row to the seed it belongs to
+6. Count what landed in striking distance
+
+### Why the window is shifted back
+
+Search Console finalises a day's figures two to three days after the fact. A
+window ending today reads near-zero across its last days and drags the average
+position down with it, so the whole window is moved back by `DATA_LAG_DAYS`
+rather than ending on today.
+
+### Why a rolling window rather than a row per day
+
+Search Console withholds queries whose daily volume is too low to anonymise, and
+on a blog this size that is most of them; aggregating over four weeks keeps them.
+Consecutive syncs therefore overlap, which is the point — two windows a few weeks
+apart are how a position that is climbing tells itself apart from one that is
+stuck.
+
+### Seed matching
+
+One `UPDATE` per sync links a row to the **longest** seed whose `normalizedSeed`
+appears in the query, so `when it comes to` wins over a shorter seed sitting
+inside the same phrase. `position()` rather than `LIKE`, so a seed containing `%`
+or `_` is matched literally.
+
+Substring matching is deliberately naive, and misses a whole category: the seed
+`adapt vs adopt` does not appear in the query `adapt adopt 차이`. The count of
+unmatched rows is written to the job log every run, and that number — not a
+guess — is what should decide whether matching needs to get cleverer.
+
+### No paging
+
+The API caps a response at 25,000 rows and this blog returns a few hundred, so
+there is no paging: code that never runs is never right when it finally does.
+The processor warns on the job when a response comes back at exactly the ceiling,
+which is the only way truncation could surface.
+
+### Settings
+
+All optional. Without the first two the app boots normally and the job completes
+having done nothing, which is what lets the code deploy before the credentials
+exist.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GSC_SITE_URL` | — | Property, exactly as Search Console spells it |
+| `GSC_SERVICE_ACCOUNT_JSON` | — | Service account key, raw JSON or base64 |
+| `GSC_SYNC_CRON` | `0 20 * * *` | When the sync fires |
+| `GSC_SYNC_TZ` | `Asia/Seoul` | Container clocks are UTC, so this matters |
+| `GSC_LOOKBACK_DAYS` | `28` | Length of the window asked for |

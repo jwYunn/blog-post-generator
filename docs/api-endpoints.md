@@ -426,3 +426,63 @@ Delete a prompt and all its mappings (CASCADE).
 Bull Board dashboard — monitor all BullMQ queues, view job status, retry failed jobs.
 
 Available in development. Not a REST API endpoint.
+
+---
+
+## Search Console
+
+### GET /search-console/schedule
+What the sync is configured to do, and when it fires next.
+
+`configured` is the field worth reading: it separates "the credentials never
+reached the server" from "the sync ran and found nothing", which look identical
+from the stored data alone.
+
+**Response** `200`
+```typescript
+{
+  cron: string
+  timezone: string
+  lookbackDays: number
+  configured: boolean        // both GSC settings present
+  siteUrl: string | null     // null while unconfigured
+  nextRunAt: string | null   // ISO 8601, null if the schedule is not registered
+}
+```
+
+### POST /search-console/sync
+Run the sync now, on the same path the schedule uses. Safe to repeat: a re-run
+for the same window updates its rows rather than duplicating them.
+
+**Response** `202`
+```typescript
+{
+  jobId: string
+}
+```
+
+### GET /search-console/opportunities
+Queries ranked closely enough that another article on the subject could plausibly
+push them onto the first page — position 8–30 in the newest window, most-seen
+first. This is what the collection stage exists to produce.
+
+`seed` is null where no seed matched the query, which is the raw material for
+seeds that do not exist yet.
+
+**Query**
+
+| Param | Default | Notes |
+|---|---|---|
+| `limit` | `50` | 1–200 |
+
+**Response** `200`
+```typescript
+Array<{
+  query: string
+  page: string
+  impressions: number
+  clicks: number
+  position: number
+  seed: string | null
+}>
+```

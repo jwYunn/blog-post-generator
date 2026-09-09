@@ -96,6 +96,7 @@ Independent pipeline for generating custom thumbnails via Replicate (not tied to
 | `thumbnail-generator` | Independent prompt-based image generation via Replicate |
 | `api-source` | Simple CRUD for tracking external API usage sources |
 | `pipeline-scheduler` | Daily run: picks a scored candidate, starts its article, tops the pool up |
+| `search-console` | Daily Search Analytics sync; collection only, nothing reads it into the pipeline yet |
 
 ## Entity Relationship Summary
 
@@ -103,6 +104,8 @@ Independent pipeline for generating custom thumbnails via Replicate (not tied to
 topic_seeds ──(1:N)──► topic_candidates ──(1:1)──► article_drafts ──(1:N)──► article_publish_records
 
 thumbnail_prompts ──(1:N)──► thumbnail_prompt_mappings ──(N:1)──► thumbnails
+
+topic_seeds ◄──(N:1, nullable)── search_console_queries
 
 api_sources  (standalone)
 ```
@@ -146,6 +149,8 @@ generating → done | failed
 | `KAKAO_ID` | Tistory/Kakao login |
 | `KAKAO_PASSWORD` | Tistory/Kakao login |
 | `CORS_ORIGIN` | Frontend origin (default: http://localhost:5173) |
+| `GSC_SITE_URL` | Search Console property (optional; unset disables the sync) |
+| `GSC_SERVICE_ACCOUNT_JSON` | Service account key, raw JSON or base64 (optional) |
 
 ## Key Conventions
 
