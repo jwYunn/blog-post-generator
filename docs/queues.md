@@ -281,13 +281,30 @@ tops up only when the pool actually thins.
 
 ### Which candidate gets picked
 
-Highest score wins, but seeds that produced an article in the last seven days
-are ranked below those that did not. Candidates from one seed are all scored in
-the same run and cluster around the same number, so score alone would let a
-single seed supply several days running — repetitive to read, and those articles
-would compete with each other for the same query. The rest breaks towards the
-least recently used seed. It is an ordering, not a filter: a pool made entirely
-of recent seeds still yields its best candidate.
+In order of precedence:
+
+1. **Seeds with no article go first.** A seed counts as covered once any of its
+   candidates has a draft that did not fail — published or still waiting for
+   review, the same test `findCoveredTitlesBySeed` uses for scoring. The second
+   article on a seed has not found readers: search tends to give a site one page
+   per query, and the first article already holds it. Two `rather` articles
+   published on the same day drew 125 impressions and none. Approval leaves a
+   seed's other candidates `pending`, so without this one generation run books
+   the next several articles on the same seed.
+2. **Then seeds with no article in the last seven days.** Candidates from one
+   seed are scored in the same run and cluster around the same number, so score
+   alone would let a single seed supply several days running.
+3. **Then highest score**, then the least recently used seed.
+
+Both preferences are orderings, not filters: a pool made entirely of covered or
+recent seeds still yields its best candidate. A filter would have stopped the
+pipeline the day it shipped, since every candidate then waiting came from a seed
+that already had an article.
+
+Fresh seeds reach the pool only by hand for now. The top-up is deliberately left
+counting every pending candidate: it can only regenerate from seeds that already
+exist, so firing it more often would add candidates to covered seeds rather than
+bring in new ones.
 
 ### Settings
 

@@ -292,19 +292,39 @@ export class TopicCandidateService {
 
   /**
    * Highest-scoring candidate still awaiting a decision, at or above
-   * `minScore`, preferring seeds that have not produced an article recently.
+   * `minScore`, preferring seeds that have never been written up, and after
+   * that seeds that have not produced an article recently.
    *
-   * Score alone would let one seed supply several days in a row - its
-   * candidates were all scored in the same run, so they cluster near the same
-   * number. Beyond looking repetitive, those articles would target nearly the
-   * same query and compete with each other. The preference is an ordering
-   * rather than a filter, so a pool made entirely of recent seeds still yields
-   * its best candidate instead of nothing.
+   * A seed that already has an article goes behind one that has none, because
+   * the second article on a seed does not find readers: search tends to give a
+   * site one page per query, and the first article already holds it. Approval
+   * leaves a seed's other candidates pending, so without this a single
+   * generation run quietly books the next several articles on the same seed.
+   *
+   * Among the rest, score alone would let one seed supply several days in a
+   * row - its candidates were all scored in the same run, so they cluster near
+   * the same number.
+   *
+   * Both preferences are orderings rather than filters, so a pool made entirely
+   * of covered or recent seeds still yields its best candidate instead of
+   * nothing. A filter would have stopped the pipeline the day it shipped: every
+   * candidate waiting at the time came from a seed that had an article.
    */
   async findBestPending(
     minScore: number,
     cooldownDays = SEED_COOLDOWN_DAYS,
   ): Promise<TopicCandidateEntity | null> {
+    // "Covered" means what it means in findCoveredTitlesBySeed: any draft that
+    // did not fail. Counting only published articles would miss the ones still
+    // waiting for review, and those pile up while publishing stays manual.
+    const seedAlreadyCovered = `EXISTS (
+      SELECT 1
+      FROM article_drafts d
+      JOIN topic_candidates sibling ON sibling.id = d."topicCandidateId"
+      WHERE sibling."topicSeedId" = seed.id
+        AND d.status != :failedStatus
+    )`;
+
     const seedUsedRecently = `EXISTS (
       SELECT 1
       FROM article_drafts d
@@ -321,7 +341,9 @@ export class TopicCandidateService {
       .andWhere('seed.isActive = true')
       .andWhere('seed.deletedAt IS NULL')
       .setParameter('cooldownDays', cooldownDays)
-      .orderBy(seedUsedRecently, 'ASC')
+      .setParameter('failedStatus', ArticleDraftStatus.FAILED)
+      .orderBy(seedAlreadyCovered, 'ASC')
+      .addOrderBy(seedUsedRecently, 'ASC')
       .addOrderBy('tc.overallScore', 'DESC')
       .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
       .getOne();

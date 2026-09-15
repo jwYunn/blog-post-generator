@@ -25,7 +25,7 @@ Automated pipeline that turns English vocabulary/grammar seed keywords into publ
 [User] PATCH /topic-candidates/:id/status  { status: "approved" }
          │
          ├── Approve target candidate
-         ├── Reject all sibling PENDING candidates (transactional)
+         ├── Sibling candidates stay PENDING (not rejected)
          └── Create ArticleDraft (status=queued)
          │
          ▼
