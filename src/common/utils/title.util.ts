@@ -1,14 +1,18 @@
-import { TopicSeedCategory } from '../../topic-seed/enums/topic-seed-category.enum';
-
-/** Both halves of the pair have to agree on how a category is capitalised */
-function categoryLabel(category: string): string {
-  return category.charAt(0).toUpperCase() + category.slice(1);
-}
-
-/** Every tag formatTitleWithCategory can produce, and the only ones stripped */
-const CATEGORY_TAGS: ReadonlySet<string> = new Set(
-  Object.values(TopicSeedCategory).map((category) => categoryLabel(category)),
-);
+/**
+ * Every tag a draft title was ever given, and the only ones stripped.
+ *
+ * Written out rather than derived from the category enum: no new title is
+ * tagged any more, so this is a record of what the stored drafts hold. Deriving
+ * it would start stripping a category added later - a word no draft was ever
+ * tagged with, and one a model could legitimately open a title with.
+ */
+const CATEGORY_TAGS: ReadonlySet<string> = new Set([
+  'Meaning',
+  'Difference',
+  'Example',
+  'Phrases',
+  'Grammar',
+]);
 
 /**
  * Whether a string carries any Hangul at all.
@@ -24,15 +28,17 @@ export function containsKorean(text: string): boolean {
   return /[\uAC00-\uD7A3\u3131-\u318E]/.test(text);
 }
 
-export function formatTitleWithCategory(
-  category: string,
-  title: string,
-): string {
-  return `[${categoryLabel(category)}] ${title}`;
-}
-
 /**
- * Remove the tag formatTitleWithCategory added, and nothing else.
+ * Remove the category tag older drafts carry at the front of their title, and
+ * nothing else.
+ *
+ * Drafts used to be titled "[Meaning] ..." after their seed's category. New ones
+ * are not: search shows roughly the first thirty characters of a title, the tag
+ * spent a third of them on an English word Korean readers do not search for, and
+ * it named the seed rather than the article - "[Meaning] Protect vs Defend vs
+ * Guard 차이점". The drafts created before that still hold the tag, so every
+ * place a reader sees a title - the post title, the thumbnail overlay, the image
+ * alt text - passes it through here.
  *
  * The previous version removed any leading bracket, which is fine until a model
  * writes one of its own - "[비즈니스] 이메일 표현" is a title, not a tag. That one

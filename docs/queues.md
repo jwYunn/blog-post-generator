@@ -169,7 +169,7 @@ Saves `ArticleOutline` object to `draft.outline`:
 ### Processor Steps
 1. Fetch `ArticleDraft`
 2. Set `status = generating_thumbnail`
-3. Strip category prefix from title via `stripTitleCategory(draft.title)`
+3. Strip the category tag older drafts carry via `stripTitleCategory(draft.title)`
 4. Call `ThumbnailImageProcessingService.processThumbnailWithText(strippedTitle)` → Buffer
 5. Upload buffer to S3 via `ThumbnailS3UploadService.upload(articleDraftId, buffer)`
 6. Save S3 URL to `draft.thumbnailImageUrl`, set `status = review_ready`
@@ -206,7 +206,9 @@ The `ArticlePublishRecord` is created by `ArticlePublishService.addPublishJob`
 5. Load `KAKAO_ID` and `KAKAO_PASSWORD` from env via `ConfigService`; take
    `blogName` from the record, falling back to `TISTORY_BLOG_NAME`
 6. Call `runTistoryPublish()` via `TistorySessionService` (Playwright automation),
-   passing `onBeforePublish` to mark the point past which a post may exist
+   passing `onBeforePublish` to mark the point past which a post may exist. The
+   title goes through `stripTitleCategory` first, so a draft created while titles
+   were still tagged is not published with its `[Meaning]`-style tag
 7. Set draft `status = published`; set record `status = published` + `permalink`
 8. On error: set draft `status = failed`, save `errorMessage`, and set record
    `status = failed` **only** if `onBeforePublish` never fired. Otherwise the

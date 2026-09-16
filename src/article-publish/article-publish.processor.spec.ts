@@ -117,6 +117,20 @@ describe('ArticlePublishProcessor', () => {
       expect(statusWhenBrowserRan).toBe(ArticleDraftStatus.PUBLISHING);
     });
 
+    // The fixture is titled the way drafts were before the tag was dropped, and
+    // those are still waiting for review - none of them should go up tagged
+    it('publishes an older draft without its category tag', async () => {
+      await processor.process(job);
+
+      expect(runPublish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          draft: expect.objectContaining({
+            title: 'Present perfect explained',
+          }),
+        }),
+      );
+    });
+
     it('publishes to the blog the record fixed when the request came in', async () => {
       await processor.process(job);
 

@@ -118,14 +118,16 @@ describe('TopicCandidateService', () => {
       );
     });
 
-    it('carries the seed category into the draft title', async () => {
+    // No "[Grammar]" in front: search shows about thirty characters of a
+    // title, and the tag was spending a third of them on an English label
+    it("titles the draft with the candidate's own title, untagged", async () => {
       await approve();
 
       expect(manager.create).toHaveBeenCalledWith(
         ArticleDraftEntity,
         expect.objectContaining({
           topicCandidateId: CANDIDATE_ID,
-          title: '[Grammar] Present perfect explained',
+          title: 'Present perfect explained',
           keyword: 'present perfect',
           status: ArticleDraftStatus.QUEUED,
         }),

@@ -13,6 +13,7 @@ import { PublishMode } from './tistory/tistory.types';
 import { ARTICLE_PUBLISH_QUEUE } from './constants';
 import { isEnabled } from '../config/env.validation';
 import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
+import { stripTitleCategory } from '../common/utils/title.util';
 
 interface ArticlePublishJobPayload {
   articleDraftId: string;
@@ -125,7 +126,10 @@ export class ArticlePublishProcessor extends WorkerHost {
 
       const { permalink } = await runTistoryPublish({
         draft: {
-          title: draft.title,
+          // Drafts written before the category tag was dropped still carry it;
+          // stripped here so it reaches neither the post title nor the alt text.
+          // Posts already published keep theirs - they are never sent again.
+          title: stripTitleCategory(draft.title),
           content: draft.content,
           thumbnailImageUrl: draft.thumbnailImageUrl,
           hashtags: draft.hashtags,

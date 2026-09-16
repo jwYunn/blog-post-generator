@@ -1,9 +1,4 @@
-import { TopicSeedCategory } from '../../topic-seed/enums/topic-seed-category.enum';
-import {
-  containsKorean,
-  formatTitleWithCategory,
-  stripTitleCategory,
-} from './title.util';
+import { containsKorean, stripTitleCategory } from './title.util';
 
 /**
  * The gate on titles the blog's own readers could never search for. It asks for
@@ -42,20 +37,6 @@ describe('containsKorean', () => {
   });
 });
 
-describe('formatTitleWithCategory', () => {
-  it('capitalises the category and prefixes the title with it', () => {
-    expect(
-      formatTitleWithCategory('meaning', 'What ghosting really means'),
-    ).toBe('[Meaning] What ghosting really means');
-  });
-
-  it('leaves an already capitalised category as it is', () => {
-    expect(formatTitleWithCategory('Grammar', 'Present perfect')).toBe(
-      '[Grammar] Present perfect',
-    );
-  });
-});
-
 describe('stripTitleCategory', () => {
   it('removes the tag and the space that follows it', () => {
     expect(stripTitleCategory('[Meaning] What ghosting really means')).toBe(
@@ -88,8 +69,8 @@ describe('stripTitleCategory, brackets that are not tags', () => {
     expect(stripTitleCategory(title)).toBe(title);
   });
 
-  // The tag is written by formatTitleWithCategory and never by hand, so an
-  // exact match is what separates one from a title that merely looks like one.
+  // The tag was only ever written by code, never by hand, so an exact match is
+  // what separates one from a title that merely looks like one.
   it('leaves a category spelled in another case alone', () => {
     expect(stripTitleCategory('[meaning] what ghosting means')).toBe(
       '[meaning] what ghosting means',
@@ -99,13 +80,20 @@ describe('stripTitleCategory, brackets that are not tags', () => {
     );
   });
 
-  it.each(Object.values(TopicSeedCategory))(
-    'still strips the real tag for category "%s"',
-    (category) => {
-      const tagged = formatTitleWithCategory(category, 'Some title');
-      expect(stripTitleCategory(tagged)).toBe('Some title');
+  // Spelled as the stored drafts spell them, since those are what reach this
+  it.each(['Meaning', 'Difference', 'Example', 'Phrases', 'Grammar'])(
+    'still strips the real tag [%s]',
+    (tag) => {
+      expect(stripTitleCategory(`[${tag}] Some title`)).toBe('Some title');
     },
   );
+
+  // Not a tag any draft carries, so it belongs to the title
+  it('keeps a bracket naming a category that was never used as a tag', () => {
+    expect(stripTitleCategory('[Idiom] break the ice')).toBe(
+      '[Idiom] break the ice',
+    );
+  });
 
   // Only the outer tag is a tag; whatever the title opens with afterwards is
   // the title's own.
@@ -114,20 +102,4 @@ describe('stripTitleCategory, brackets that are not tags', () => {
       '[비즈니스] 이메일 표현',
     );
   });
-});
-
-describe('the pair, round trip', () => {
-  // The tag is added when a candidate is approved and removed again to build
-  // the thumbnail alt text, so a category that survives one direction but not
-  // the other would put "[Meaning] ..." in front of readers. Every category the
-  // seed enum can produce goes through both.
-  it.each(Object.values(TopicSeedCategory))(
-    'recovers the original title for category "%s"',
-    (category) => {
-      const title = 'How to use get used to';
-      expect(stripTitleCategory(formatTitleWithCategory(category, title))).toBe(
-        title,
-      );
-    },
-  );
 });

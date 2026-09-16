@@ -24,10 +24,7 @@ import {
 } from './dto/update-topic-candidate-status.dto';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
-import {
-  formatTitleWithCategory,
-  stripTitleCategory,
-} from '../common/utils/title.util';
+import { stripTitleCategory } from '../common/utils/title.util';
 import {
   ARTICLE_OUTLINE_QUEUE,
   GENERATE_ARTICLE_OUTLINE_JOB,
@@ -221,10 +218,7 @@ export class TopicCandidateService {
         } else {
           const newDraft = manager.create(ArticleDraftEntity, {
             topicCandidateId: id,
-            title: formatTitleWithCategory(
-              candidate.topicSeed.category,
-              candidate.title,
-            ),
+            title: candidate.title,
             keyword: candidate.keyword,
             status: ArticleDraftStatus.QUEUED,
           });

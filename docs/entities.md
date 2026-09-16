@@ -88,7 +88,7 @@ One-to-one with an approved `TopicCandidate`. Tracks the full lifecycle from out
 |--------|------|-------------|-------|
 | `id` | UUID | PK | |
 | `topicCandidateId` | UUID | FK→topic_candidates, UNIQUE, CASCADE | One draft per candidate |
-| `title` | VARCHAR(300) | NOT NULL | Includes category prefix |
+| `title` | VARCHAR(300) | NOT NULL | The candidate's title. Older drafts carry a `[Meaning]`-style tag, stripped wherever a reader sees it |
 | `keyword` | VARCHAR(200) | NOT NULL | SEO keyword |
 | `outline` | JSONB | NULLABLE | `ArticleOutline` object |
 | `content` | TEXT | NULLABLE | Full markdown article |
