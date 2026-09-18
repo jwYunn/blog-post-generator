@@ -1,11 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type ReplicateType from 'replicate';
+// replicate sets module.exports to the class itself; the default import
+// resolves to it through esModuleInterop
+import Replicate from 'replicate';
 import type { ThumbnailPromptMeta } from './entities/thumbnail-prompt.entity';
-
-// replicate package uses module.exports = Replicate (direct class export), so use require() instead of ES default import
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const ReplicateSDK = require('replicate') as typeof ReplicateType;
 
 export interface ReplicateOutput {
   buffer: Buffer;
@@ -15,10 +13,10 @@ export interface ReplicateOutput {
 @Injectable()
 export class ThumbnailGeneratorAiService {
   private readonly logger = new Logger(ThumbnailGeneratorAiService.name);
-  private readonly replicate: ReplicateType;
+  private readonly replicate: Replicate;
 
   constructor(private readonly configService: ConfigService) {
-    this.replicate = new ReplicateSDK({
+    this.replicate = new Replicate({
       auth: this.configService.get<string>('REPLICATE_API_TOKEN'),
     });
   }
