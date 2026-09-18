@@ -141,6 +141,14 @@ export class ArticleDraftService {
         `ArticleDraft #${id} is not ready to publish (current: ${draft.status})`,
       );
     }
+    // FAILED also covers a draft that died during outline or content
+    // generation. Checked here rather than left to the worker, because by the
+    // time the worker sees it an attempt record has already been written.
+    if (!draft.content) {
+      throw new ConflictException(
+        `ArticleDraft #${id} is not ready to publish - no content (current: ${draft.status})`,
+      );
+    }
 
     return this.articlePublishService.addPublishJob(id, dto);
   }

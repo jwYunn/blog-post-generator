@@ -231,6 +231,9 @@ Trigger publishing to Tistory.
 - Draft status must be `review_ready`, `failed` or `publishing`. Anything else
   is rejected with `409` — previously such a request reached the worker and
   marked the draft failed on its way out.
+- The draft must have content. A draft that failed during outline or content
+  generation is `failed` too, but has none, and is rejected with `409` before
+  any attempt record is written.
 - The draft must carry no publish attempt in `attempting` or `published`. A
   `409` naming the record means someone has to check the blog and then delete
   that record, or set its status to `failed`, before retrying.

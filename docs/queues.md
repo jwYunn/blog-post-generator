@@ -201,7 +201,9 @@ The `ArticlePublishRecord` is created by `ArticlePublishService.addPublishJob`
 ### Processor Steps
 1. Fetch the `ArticlePublishRecord` named by the payload
 2. Fetch `ArticleDraft` with all relations
-3. Validate `draft.content` exists
+3. Validate `draft.content` exists. If the draft is missing or has no content,
+   set record `status = failed` (nothing was posted) and fail the job, leaving
+   the draft as it is
 4. Set draft `status = publishing`
 5. Load `KAKAO_ID` and `KAKAO_PASSWORD` from env via `ConfigService`; take
    `blogName` from the record, falling back to `TISTORY_BLOG_NAME`

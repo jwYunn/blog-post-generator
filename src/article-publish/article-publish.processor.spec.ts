@@ -80,6 +80,7 @@ describe('ArticlePublishProcessor', () => {
     publishRecordRepository = {
       findOne: jest.fn(async () => record),
       save: jest.fn(async (entity) => entity),
+      update: jest.fn(async () => ({ affected: 1 })),
     };
     job = buildJob();
     runPublish.mockResolvedValue({ permalink: PERMALINK });
@@ -237,26 +238,51 @@ describe('ArticlePublishProcessor', () => {
       );
       expect(runPublish).not.toHaveBeenCalled();
       expect(draftRepository.save).not.toHaveBeenCalled();
+      expect(publishRecordRepository.update).not.toHaveBeenCalled();
     });
 
-    it('fails when the draft is missing', async () => {
+    it('fails when the draft is missing, releasing the record', async () => {
       draftRepository.findOne.mockResolvedValue(null);
 
       await expect(processor.process(job)).rejects.toThrow(
         /ArticleDraft #draft-1 not found/,
       );
       expect(runPublish).not.toHaveBeenCalled();
+      expect(publishRecordRepository.update).toHaveBeenCalledWith(RECORD_ID, {
+        status: ArticlePublishRecordStatus.FAILED,
+      });
     });
 
-    // Publishing an empty article is worse than not publishing it, and the
-    // record stays untouched so the draft can go out once it has content.
-    it('fails when the draft has no content, leaving the record alone', async () => {
+    // A draft that failed during generation has no content. Nothing reached the
+    // blog, so a record left attempting would block every later publish of the
+    // draft with nothing for a human to check.
+    it('fails when the draft has no content, releasing the record', async () => {
       draft.content = null;
+      draft.status = ArticleDraftStatus.FAILED;
+      draft.errorMessage = 'outline generation failed';
 
       await expect(processor.process(job)).rejects.toThrow(/has no content/);
+
       expect(runPublish).not.toHaveBeenCalled();
-      expect(publishRecordRepository.save).not.toHaveBeenCalled();
-      expect(record.status).toBe(ArticlePublishRecordStatus.ATTEMPTING);
+      expect(publishRecordRepository.update).toHaveBeenCalledWith(RECORD_ID, {
+        status: ArticlePublishRecordStatus.FAILED,
+      });
+      expect(jobLogText()).toContain('has no content');
+      expect(jobLogText()).toContain('safe to retry');
+    });
+
+    // The run never took the draft over, so the reason it failed earlier is
+    // still the one worth reading
+    it('leaves a draft with no content as it found it', async () => {
+      draft.content = null;
+      draft.status = ArticleDraftStatus.FAILED;
+      draft.errorMessage = 'outline generation failed';
+
+      await expect(processor.process(job)).rejects.toThrow();
+
+      expect(draftRepository.save).not.toHaveBeenCalled();
+      expect(draft.status).toBe(ArticleDraftStatus.FAILED);
+      expect(draft.errorMessage).toBe('outline generation failed');
     });
   });
 });

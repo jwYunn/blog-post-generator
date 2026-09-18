@@ -64,14 +64,18 @@ export class ArticlePublishProcessor extends WorkerHost {
       relations: ['topicCandidate', 'topicCandidate.topicSeed'],
     });
     if (!draft) {
-      const error = new Error(`ArticleDraft #${articleDraftId} not found`);
-      await jobFailed(job, error);
-      throw error;
+      return this.failBeforePublish(
+        job,
+        record,
+        new Error(`ArticleDraft #${articleDraftId} not found`),
+      );
     }
     if (!draft.content) {
-      const error = new Error(`ArticleDraft #${articleDraftId} has no content`);
-      await jobFailed(job, error);
-      throw error;
+      return this.failBeforePublish(
+        job,
+        record,
+        new Error(`ArticleDraft #${articleDraftId} has no content`),
+      );
     }
 
     await jobStep(
@@ -198,5 +202,32 @@ export class ArticlePublishProcessor extends WorkerHost {
       await this.draftRepository.save(draft);
       throw error;
     }
+  }
+
+  /**
+   * Fails a run that stopped before the draft was touched or the browser was
+   * started. Nothing can have been posted, so the record is marked failed -
+   * left attempting, it would block every later publish of the draft until a
+   * human cleared it, with nothing on the blog for them to find.
+   *
+   * The draft is left as it is: this run never took it over, and something
+   * else may have since.
+   */
+  private async failBeforePublish(
+    job: Job<ArticlePublishJobPayload>,
+    record: ArticlePublishRecordEntity,
+    error: Error,
+  ): Promise<never> {
+    await jobFailed(job, error);
+    // update rather than save: a deleted draft takes its records with it by
+    // cascade, and save would try to insert this one back
+    await this.publishRecordRepository.update(record.id, {
+      status: ArticlePublishRecordStatus.FAILED,
+    });
+    await jobLog(
+      job,
+      `record ${record.id} marked failed - nothing was posted, safe to retry`,
+    );
+    throw error;
   }
 }
