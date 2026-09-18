@@ -29,7 +29,7 @@ export class ArticleDraftController {
 
   @Get('article-drafts/:id')
   findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.articleDraftService.findOne(id);
+    return this.articleDraftService.findDetail(id);
   }
 
   @Post('article-drafts/:id/publish')

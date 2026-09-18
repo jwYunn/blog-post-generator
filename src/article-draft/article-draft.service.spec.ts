@@ -105,4 +105,24 @@ describe('ArticleDraftService', () => {
       expect(articlePublishService.addPublishJob).not.toHaveBeenCalled();
     });
   });
+
+  // The detail view links back to these, so the relations are the contract
+  describe('findDetail', () => {
+    it('loads the candidate and seed the draft came from', async () => {
+      await service.findDetail(DRAFT_ID);
+
+      expect(draftRepository.findOne).toHaveBeenCalledWith({
+        where: { id: DRAFT_ID },
+        relations: { topicCandidate: { topicSeed: true } },
+      });
+    });
+
+    it('answers 404 for a draft that does not exist', async () => {
+      draftRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.findDetail(DRAFT_ID)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });

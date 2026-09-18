@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
@@ -70,6 +70,11 @@ type RejectResult = {
   status: 'rejected';
 };
 
+/** A listed candidate, with the draft its approval made if there is one */
+export type CandidateListItem = TopicCandidateEntity & {
+  articleDraftId: string | null;
+};
+
 @Injectable()
 export class TopicCandidateService {
   constructor(
@@ -123,7 +128,7 @@ export class TopicCandidateService {
   }
 
   async findAll(dto: QueryTopicCandidateListDto): Promise<{
-    data: TopicCandidateEntity[];
+    data: CandidateListItem[];
     total: number;
     page: number;
     limit: number;
@@ -163,9 +168,35 @@ export class TopicCandidateService {
     qb.orderBy(`tc.${sortBy}`, sortOrder);
     qb.skip((page - 1) * limit).take(limit);
 
-    const [data, total] = await qb.getManyAndCount();
+    const [candidates, total] = await qb.getManyAndCount();
+    const data = await this.withArticleDraftIds(candidates);
 
     return { data, total, page, limit };
+  }
+
+  /**
+   * Pairs each candidate with its draft so a list can link straight to the
+   * article - including drafts the scheduler started, which nobody saw being
+   * approved. A second query for the page rather than a join, which would load
+   * every draft column, content included, just to read an id.
+   */
+  private async withArticleDraftIds(
+    candidates: TopicCandidateEntity[],
+  ): Promise<CandidateListItem[]> {
+    if (candidates.length === 0) return [];
+
+    const drafts = await this.draftRepository.find({
+      select: { id: true, topicCandidateId: true },
+      where: { topicCandidateId: In(candidates.map((c) => c.id)) },
+    });
+    const draftIdByCandidate = new Map(
+      drafts.map((d) => [d.topicCandidateId, d.id]),
+    );
+
+    return candidates.map((candidate) => ({
+      ...candidate,
+      articleDraftId: draftIdByCandidate.get(candidate.id) ?? null,
+    }));
   }
 
   async updateStatus(

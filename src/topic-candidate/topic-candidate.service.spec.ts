@@ -1,4 +1,5 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { In } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
 import { GENERATE_ARTICLE_OUTLINE_JOB } from '../article-outline/article-outline.constants';
@@ -227,6 +228,54 @@ describe('TopicCandidateService', () => {
 
       await expect(approve()).rejects.toBeInstanceOf(NotFoundException);
       expect(outlineQueue.add).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listing candidates', () => {
+    function stubPage(candidates: TopicCandidateEntity[]) {
+      const qb = {
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn(async () => [candidates, candidates.length]),
+      };
+      candidateRepository.createQueryBuilder = jest.fn(() => qb);
+    }
+
+    beforeEach(() => {
+      draftRepository.find = jest.fn(async () => []);
+    });
+
+    it('links each candidate to the draft its approval made', async () => {
+      stubPage([
+        buildCandidate({ status: TopicCandidateStatus.APPROVED }),
+        buildCandidate({ id: 'candidate-2' }),
+      ]);
+      draftRepository.find.mockResolvedValue([
+        { id: DRAFT_ID, topicCandidateId: CANDIDATE_ID },
+      ]);
+
+      const { data } = await service.findAll({});
+
+      expect(draftRepository.find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { topicCandidateId: In([CANDIDATE_ID, 'candidate-2']) },
+        }),
+      );
+      expect(data.map((c) => [c.id, c.articleDraftId])).toEqual([
+        [CANDIDATE_ID, DRAFT_ID],
+        ['candidate-2', null],
+      ]);
+    });
+
+    it('skips the draft lookup for an empty page', async () => {
+      stubPage([]);
+
+      const { data } = await service.findAll({});
+
+      expect(data).toEqual([]);
+      expect(draftRepository.find).not.toHaveBeenCalled();
     });
   });
 

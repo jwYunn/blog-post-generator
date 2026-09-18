@@ -127,6 +127,22 @@ export class ArticleDraftService {
     return draft;
   }
 
+  /**
+   * The draft with the candidate and seed it came from, so the detail view can
+   * link back up the pipeline. Kept apart from findOne, which the publish path
+   * reads and which has no use for either.
+   */
+  async findDetail(id: string): Promise<ArticleDraftEntity> {
+    const draft = await this.draftRepository.findOne({
+      where: { id },
+      relations: { topicCandidate: { topicSeed: true } },
+    });
+    if (!draft) {
+      throw new NotFoundException(`ArticleDraft #${id} not found`);
+    }
+    return draft;
+  }
+
   async publish(
     id: string,
     dto: CreatePublishJobDto,
