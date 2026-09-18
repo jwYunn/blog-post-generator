@@ -5,7 +5,7 @@
 | Module | Service | Provider | Model | Max Tokens | Task |
 |--------|---------|----------|-------|------------|------|
 | topic-generate | `TopicGenerateAiService` | Anthropic | `claude-opus-4-5` | 4096 | Generate 10 topic candidates |
-| topic-evaluate | `TopicEvaluateAiService` | OpenAI | `gpt-4o` | 8192 | Score & rank candidates |
+| topic-evaluate | `TopicEvaluateAiService` | OpenAI | `gpt-5.6-luna` | 16384 | Score & rank candidates |
 | article-outline | `ArticleOutlineAiService` | OpenAI | `gpt-5` | — | Generate SEO article outline |
 | article-content | `ArticleContentAiService` | Anthropic | `claude-sonnet-5` | 20000 | Write full markdown article |
 | article-content | `ArticleContentAiService` | Anthropic | `claude-haiku-4-5` | 300 | Generate 10 hashtags |
@@ -77,7 +77,7 @@ Array<{
 ## TopicEvaluateAiService
 
 **File**: `src/topic-evaluate/topic-evaluate-ai.service.ts`
-**Model**: `gpt-4o` (OpenAI)
+**Model**: `gpt-5.6-luna` (OpenAI), max completion tokens: 16384
 
 ### Method: `evaluateCandidates(candidates: CandidateInput[])`
 

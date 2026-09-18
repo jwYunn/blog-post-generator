@@ -74,16 +74,18 @@ export class TopicEvaluateAiService {
     );
 
     const response = await this.openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-5.6-luna',
       messages: [{ role: 'user', content: prompt }],
-      max_completion_tokens: 8192,
+      // Reasoning is drawn from the same budget, and one call can carry twenty
+      // candidates - 8192 left gpt-4o room, not a reasoning model
+      max_completion_tokens: 16384,
     });
 
     const text = response.choices[0]?.message?.content ?? '';
 
     const items = parseJsonArrayResponse<RawEvaluationItem>(
       text,
-      'gpt-4o candidate evaluation',
+      'gpt-5.6-luna candidate evaluation',
       this.logger,
     );
 

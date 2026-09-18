@@ -80,7 +80,7 @@ export class TopicEvaluateProcessor extends WorkerHost {
         await this.topicCandidateService.findCoveredTitlesBySeed(seedId);
       await jobLog(job, `${covered.length} article(s) already cover this seed`);
 
-      await jobStep(job, 20, 'calling gpt-4o to score candidates');
+      await jobStep(job, 20, 'calling gpt-5.6-luna to score candidates');
       const evaluations = await this.topicEvaluateAiService.evaluateCandidates(
         candidateInputs,
         covered,

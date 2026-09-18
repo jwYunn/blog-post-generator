@@ -246,14 +246,14 @@ describe('TopicEvaluateProcessor', () => {
 
   it('records the reason on the job and rethrows when the model fails', async () => {
     aiService.evaluateCandidates.mockRejectedValue(
-      new Error('gpt-4o returned prose'),
+      new Error('gpt-5.6-luna returned prose'),
     );
 
     await expect(processor.process(job)).rejects.toThrow(
-      'gpt-4o returned prose',
+      'gpt-5.6-luna returned prose',
     );
 
-    expect(jobLogText()).toContain('FAILED: gpt-4o returned prose');
+    expect(jobLogText()).toContain('FAILED: gpt-5.6-luna returned prose');
     expect(candidateService.saveEvaluations).not.toHaveBeenCalled();
   });
 });
