@@ -47,7 +47,13 @@ services:
     restart: unless-stopped
 
   browserless:
-    image: ghcr.io/browserless/chromium:latest
+    # browserless 2.55.2, pinned to the exact build the server has run since
+    # 2026-07-30 (the v2.55.2 tag is a separate build with another digest).
+    # chromium.connect needs a client version the server knows - this build
+    # serves Playwright 1.58 through 1.62 - so an unpinned :latest could stop
+    # accepting the app's client after any pull. Move this and the playwright
+    # packages together, checking the new build's supported client range.
+    image: ghcr.io/browserless/chromium@sha256:07f6561d607b80312cc9b2500e98e40cf1eb0276fb647984fa074c96b9dd41dc
     container_name: blog-generator-browserless
     logging: *default-logging
     environment:
