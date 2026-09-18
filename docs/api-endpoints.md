@@ -131,7 +131,7 @@ List candidates with pagination, filtering, and sorting.
 ```
 page?          number
 limit?         number
-seedId?        string UUID — filter by parent seed
+topicSeedId?   string UUID — filter by parent seed
 status?        'pending' | 'approved' | 'rejected'
 keyword?       string — partial match on keyword
 minScore?      number
@@ -143,12 +143,16 @@ sortOrder?     'ASC' | 'DESC'
 **Response** `200`
 ```typescript
 {
-  data: TopicCandidate[]
+  data: (TopicCandidate & {
+    articleDraftId: string | null   // the draft its approval made, if any
+  })[]
   total: number
   page: number
   limit: number
 }
 ```
+
+`GET /topic-seeds/:id/candidates` returns the same shape.
 
 ---
 
@@ -210,9 +214,15 @@ status?   ArticleDraftStatus
 ---
 
 ### GET /article-drafts/:id
-Get a single draft (includes outline, content, hashtags).
+Get a single draft (includes outline, content, hashtags), with the candidate
+and seed it came from joined in. The list endpoint does not join them.
 
-**Response** `200` — `ArticleDraft` object, or `404`
+**Response** `200`, or `404`
+```typescript
+ArticleDraft & {
+  topicCandidate: TopicCandidate & { topicSeed: TopicSeed }
+}
+```
 
 ---
 
