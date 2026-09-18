@@ -75,7 +75,7 @@ export class TopicEvaluateAiService {
     const response = await this.openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 8192,
+      max_completion_tokens: 8192,
     });
 
     const text = response.choices[0]?.message?.content ?? '';
