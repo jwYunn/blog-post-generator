@@ -10,6 +10,7 @@ import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
 import { EvaluationScope } from './enums/evaluation-scope.enum';
+import { ArticleDepth } from './enums/article-depth.enum';
 
 /** Days a seed rests after one of its candidates became an article */
 const SEED_COOLDOWN_DAYS = 7;
@@ -38,6 +39,7 @@ export interface CandidatePayload {
   targetReader: string | null;
   whyThisTopic: string | null;
   outlinePreview: string[] | null;
+  depth: ArticleDepth | null;
 }
 
 export interface EvaluationPayload {
@@ -105,6 +107,7 @@ export class TopicCandidateService {
           targetReader: c.targetReader,
           whyThisTopic: c.whyThisTopic,
           outlinePreview: c.outlinePreview,
+          depth: c.depth,
           status: TopicCandidateStatus.PENDING,
         }),
       );

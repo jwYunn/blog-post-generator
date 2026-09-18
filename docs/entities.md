@@ -49,6 +49,7 @@ AI-generated topic ideas derived from a seed. Includes evaluation results after 
 | `targetReader` | VARCHAR(20) | NULLABLE | e.g. "beginner", "intermediate" |
 | `whyThisTopic` | TEXT | NULLABLE | Rationale from generation prompt |
 | `outlinePreview` | JSONB | NULLABLE | `string[]` — preview section titles |
+| `depth` | VARCHAR(10) | NULLABLE | `'brief' \| 'standard'`; null when undecided, built as standard |
 | `overallScore` | DECIMAL(5,2) | NULLABLE | GPT evaluation score (0–100) |
 | `rank` | INT | NULLABLE | Rank among siblings (1 = best) |
 | `strengths` | JSONB | NULLABLE | `string[]` |
@@ -288,3 +289,4 @@ what people were searching for while it existed.
 | 1774483200000 | CreateThumbnailGeneratorTables | Create `thumbnail_prompts`, `thumbnails`, `thumbnail_prompt_mappings` |
 | 1774569600000 | AddPublishAttemptTrackingToPublishRecords | Add `status`, `blogName` to `article_publish_records` |
 | 1774656000000 | CreateSearchConsoleQueriesTable | Create `search_console_queries` |
+| 1774742400000 | AddDepthToTopicCandidates | Add `depth` to `topic_candidates` |

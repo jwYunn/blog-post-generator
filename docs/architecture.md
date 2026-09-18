@@ -47,7 +47,7 @@ The content generation pipeline is driven entirely by BullMQ jobs. No stage dire
         ▼
   article-content queue
   └── ArticleContentProcessor (concurrency: 3)
-      └── Claude Sonnet 4.6 → writes Korean blog post (~2000 chars)
+      └── Claude Sonnet 4.6 → writes Korean blog post (800–2,500 chars by depth)
       └── Claude Haiku 4.5 → generates 10 SEO hashtags (parallel)
       └── status → content_generated
       └── enqueues → article-thumbnail

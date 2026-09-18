@@ -7,11 +7,13 @@ import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
 import { ArticleOutlineAiService } from './article-outline-ai.service';
 import { ARTICLE_OUTLINE_QUEUE } from './article-outline.constants';
+import { OUTLINE_SHAPES } from './article-outline-prompt';
 import {
   ARTICLE_CONTENT_QUEUE,
   GENERATE_ARTICLE_CONTENT_JOB,
 } from '../article-content/article-content.constants';
-import { jobFailed, jobStep } from '../common/queue/job-log.util';
+import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
+import { resolveArticleDepth } from '../common/utils/article-depth.util';
 
 interface ArticleOutlineJobPayload {
   articleDraftId: string;
@@ -53,22 +55,26 @@ export class ArticleOutlineProcessor extends WorkerHost {
 
     try {
       const candidate = draft.topicCandidate;
+      const depth = resolveArticleDepth(candidate?.depth);
+      const shape = OUTLINE_SHAPES[depth];
 
       await jobStep(
         job,
         20,
-        `calling gpt-5 - intent: ${candidate?.searchIntent ?? 'n/a'}, ` +
+        `calling gpt-5 - depth: ${depth}${candidate?.depth ? '' : ' (not set)'}, ` +
+          `intent: ${candidate?.searchIntent ?? 'n/a'}, ` +
           `reader: ${candidate?.targetReader ?? 'n/a'}, ` +
           `preview points: ${candidate?.outlinePreview?.length ?? 0}`,
       );
 
-      const outline = await this.articleOutlineAiService.generateOutline(
-        draft.title,
-        draft.keyword,
-        candidate?.searchIntent ?? null,
-        candidate?.targetReader ?? null,
-        candidate?.outlinePreview ?? null,
-      );
+      const outline = await this.articleOutlineAiService.generateOutline({
+        title: draft.title,
+        keyword: draft.keyword,
+        searchIntent: candidate?.searchIntent ?? null,
+        targetReader: candidate?.targetReader ?? null,
+        outlinePreview: candidate?.outlinePreview ?? null,
+        depth,
+      });
 
       await jobStep(
         job,
@@ -76,7 +82,20 @@ export class ArticleOutlineProcessor extends WorkerHost {
         `outline: ${outline.sections.length} sections, ${outline.faqs.length} FAQs`,
       );
 
-      draft.outline = outline;
+      // Not a failure: the article still gets written, to the length of its
+      // depth. But a model that ignores the section rule is what would make
+      // a brief article cramped, so it is worth seeing when it happens.
+      const { min, max } = shape.sections;
+      if (outline.sections.length < min || outline.sections.length > max) {
+        await jobLog(
+          job,
+          `WARNING: a ${depth} outline should have ` +
+            `${min === max ? min : `${min}-${max}`} sections, ` +
+            `got ${outline.sections.length} - the model did not follow depth`,
+        );
+      }
+
+      draft.outline = { ...outline, depth };
       draft.status = ArticleDraftStatus.OUTLINE_GENERATED;
       draft.errorMessage = null;
       await this.draftRepository.save(draft);

@@ -11,6 +11,21 @@
 | article-content | `ArticleContentAiService` | Anthropic | `claude-haiku-4-5` | 300 | Generate 10 hashtags |
 | thumbnail-generator | `ThumbnailGeneratorAiService` | Replicate | `black-forest-labs/flux-schnell` (default) | — | Generate thumbnail images |
 
+## Where prompts live
+
+Every model prompt is in its module's `<module>-prompt.ts`; the service only
+makes the call and parses the answer. A prompt change is then a diff to that
+file alone, and the prompt can be tested without loading a model SDK.
+
+The form follows the prompt. `topic-generate` and `topic-evaluate` have no
+conditions, so they are constant templates whose `{{PLACEHOLDERS}}` the service
+fills. `article-outline` and `article-content` change whole lines by depth and
+drop a block when an outline has no FAQs, which placeholders cannot express
+without moving that logic back into the service - so they export builder
+functions instead. What a prompt asks for sits beside it: `OUTLINE_SHAPES` and
+`CONTENT_LENGTHS` are in the prompt files, and the processors read them from
+there to check a result against what was asked.
+
 ---
 
 ## TopicGenerateAiService
@@ -34,6 +49,7 @@ seedText: string  // e.g. "custom vs customs"
   well written, and searched by nobody
 - Each candidate targets Korean English learners searching on Google
 - Title must be in Korean (SEO-friendly)
+- Each candidate gets a **depth** — see [Article depth](#article-depth)
 - Output strict JSON array (no markdown fences)
 
 Titles with no Korean in them are dropped in `TopicGenerateAiService` rather than
@@ -48,8 +64,9 @@ Array<{
   primary_keyword: string // Main SEO keyword
   search_intent: string   // e.g. "informational"
   target_reader: string   // e.g. "beginner", "intermediate"
+  depth: string           // "brief" | "standard"; stored as null if unusable
   why_this_topic: string  // Rationale
-  outline_preview: string[] // 3–5 section title hints
+  outline_preview: string[] // 1–2 hints for brief, 3 for standard
 }>
 ```
 
@@ -72,6 +89,7 @@ Array<{
   keyword: string
   searchIntent: string
   targetReader: string
+  depth: string | null    // null is treated as standard
   whyThisTopic: string
   outlinePreview: string[]
 }>
@@ -89,7 +107,10 @@ already been turned into articles under.
 - `seo_title_quality` [0.15] — title click-worthiness and keyword placement; a
   title with no Korean in it scores 1
 - `practical_value` [0.15] — useful / actionable content for learners
-- `outline_feasibility` [0.05] — can be written as a complete 2000-char article
+- `outline_feasibility` [0.05] — can be written as a complete post *of its
+  depth*. A brief topic is one or two sections by design and is not marked down
+  for being short; without depth in the input, its one-point preview read as
+  thin and pushed it below the score the scheduler draws from
 - `uniqueness` [0.05] — differentiated from the batch and from what the seed has
   already covered
 
@@ -144,32 +165,39 @@ Array<{
 **Model**: `gpt-5` (OpenAI)
 **System role**: `"You generate structured SEO blog outlines."`
 
-### Method: `generateOutline(title, keyword, searchIntent, targetReader, outlinePreview)`
+### Method: `generateOutline(input)`
 
 **Input**
 ```typescript
-title: string
-keyword: string
-searchIntent: string | null
-targetReader: string | null
-outlinePreview: string[] | null  // hints from candidate generation
+{
+  title: string
+  keyword: string
+  searchIntent: string | null
+  targetReader: string | null
+  outlinePreview: string[] | null  // hints from candidate generation
+  depth: ArticleDepth              // resolved; undecided is standard
+}
 ```
 
+The prompt is built by `buildOutlinePrompt` in `article-outline-prompt.ts`.
+
 **Prompt requirements**:
-- Exactly 3 main sections (no more, no less)
+- Sections and FAQs by depth — `OUTLINE_SHAPES` in `article-outline-prompt.ts`:
+  brief asks for 1–2 sections and at most one FAQ; standard for exactly 3
+  sections and 1–2 FAQs, word for word what every outline was asked for before
 - All section titles and FAQ items in Korean
 - Keep English vocabulary and SEO terms in English within Korean sentences
-- Sections must not overlap in content
-- 1–2 FAQ items; FAQ must not repeat section topics
+- Sections must not overlap in content; FAQ must not repeat section topics
 
-**Output** — parsed JSON:
+**Output** — parsed JSON; the processor adds `depth` before storing it:
 ```typescript
 {
   title: string
   keyword: string
   searchIntent: string
-  sections: string[]  // exactly 3 Korean section titles
-  faqs: string[]      // 1–2 Korean FAQ questions
+  sections: string[]  // 1–2 for brief, 3 for standard
+  faqs: string[]      // 0–1 for brief, 1–2 for standard
+  depth?: ArticleDepth // set by the pipeline, absent on older outlines
 }
 ```
 
@@ -189,13 +217,19 @@ outlinePreview: string[] | null  // hints from candidate generation
   title: string
   keyword: string
   outline: ArticleOutline  // { sections, faqs, ... }
+  depth: ArticleDepth      // from the outline, not the candidate
 }
 ```
+
+The prompt is built by `buildContentPrompt` in `article-content-prompt.ts`.
 
 **Content requirements**:
 - Audience: Korean English learners
 - Tone: friendly, practical, educational (not academic)
-- Length: 1800–2500 Korean characters (hard max: 3000)
+- Length by depth — `CONTENT_LENGTHS` in `article-content-prompt.ts`:
+  brief 800–1,200 Korean characters (hard max 1,500); standard 1,800–2,500
+  (hard max 3,000)
+- An outline with no FAQs gets no FAQ block, and is told not to add one
 - Language: Korean explanations + English vocabulary/examples
 - Format: Markdown
   - NO blockquotes (`>`)
@@ -209,6 +243,8 @@ outlinePreview: string[] | null  // hints from candidate generation
 ### Method 2: `generateHashtags(input)`
 
 **Model**: `claude-haiku-4-5` (Anthropic), max tokens: 300
+
+The prompt is built by `buildHashtagsPrompt` in `article-content-prompt.ts`.
 
 **Input**
 ```typescript
@@ -291,3 +327,34 @@ Array<{
 | Article content | Claude Sonnet | Best balance of quality/cost for long-form Korean |
 | Hashtags | Claude Haiku | Simple extraction task; minimize cost |
 | Thumbnails | Replicate Flux Schnell | Fast iteration; swap model in request payload |
+
+---
+
+## Article depth
+
+`ArticleDepth` — `brief` or `standard` — is how much an article has to say to
+satisfy the search behind it. It is not the reader's level: a beginner question
+can need several sections, and an advanced one can be answered in one.
+
+| | brief | standard |
+|---|---|---|
+| Topic | one expression, one core point | several meanings, or two expressions compared |
+| Example | 수고하셨습니다 영어로, otherwise 품사 | otherwise 뜻과 사용법, adapt vs adopt 차이 |
+| Outline | 1–2 sections, at most 1 FAQ | exactly 3 sections, 1–2 FAQs |
+| Length | 800–1,200 chars (max 1,500) | 1,800–2,500 chars (max 3,000) |
+
+Decided once, when the candidate is generated, and carried forward:
+
+1. **Generation** asks for it and stores it on the candidate. An unusable answer
+   is stored as null, so a stored candidate shows whether depth was decided
+2. **Evaluation** receives it, so a brief candidate is not marked down as thin
+3. **Outline** resolves it (null → standard), builds the matching shape, and
+   records `depth` on the stored outline
+4. **Content** takes depth from the outline, so the length follows the structure
+   the article is actually written to
+
+Standard is exactly the shape and length every article had before depth
+existed, and anything undecided is built as standard — the candidates already in
+the pool when this shipped come out as they would have. The fixed shape was the
+problem it replaces: an outline asked for three sections regardless of topic, so
+a one-point question was padded out to fill them.

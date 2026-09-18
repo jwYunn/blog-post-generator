@@ -3,6 +3,7 @@ import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.
 import { GENERATE_ARTICLE_THUMBNAIL_JOB } from '../article-thumbnail/article-thumbnail.constants';
 import { ArticleOutline } from '../article-outline/article-outline.types';
 import { ArticleContentProcessor } from './article-content.processor';
+import { ArticleDepth } from '../topic-candidate/enums/article-depth.enum';
 
 const DRAFT_ID = 'draft-1';
 const CONTENT = '# Heading\n\nBody text.';
@@ -87,13 +88,55 @@ describe('ArticleContentProcessor', () => {
     );
   });
 
-  it('builds the content from the stored outline', async () => {
+  // The fixture outline predates depth, as every outline built before it does
+  it('builds the content from the stored outline, as standard when it has no depth', async () => {
     await processor.process(job);
 
     expect(contentAiService.generateContent).toHaveBeenCalledWith({
       title: '[Grammar] Present perfect explained',
       keyword: 'present perfect',
       outline: OUTLINE,
+      depth: ArticleDepth.STANDARD,
+    });
+  });
+
+  describe('length by depth', () => {
+    function jobLogText(): string {
+      return (job.log as jest.Mock).mock.calls
+        .map((call) => call[0])
+        .join('\n');
+    }
+
+    // Read from the outline, not the candidate: the length follows the
+    // structure the article is actually being written to
+    it('writes a brief outline to the brief length', async () => {
+      draft.outline = { ...OUTLINE, depth: ArticleDepth.BRIEF };
+
+      await processor.process(job);
+
+      expect(contentAiService.generateContent).toHaveBeenCalledWith(
+        expect.objectContaining({ depth: ArticleDepth.BRIEF }),
+      );
+      expect(jobLogText()).toContain('(brief target 800-1,200)');
+    });
+
+    it('warns when an article runs past its ceiling', async () => {
+      draft.outline = { ...OUTLINE, depth: ArticleDepth.BRIEF };
+      contentAiService.generateContent.mockResolvedValue('가'.repeat(1600));
+
+      await processor.process(job);
+
+      expect(jobLogText()).toContain(
+        'WARNING: 1600 chars is over the brief ceiling of 1,500',
+      );
+      // Kept, not failed: a long article is still an article
+      expect(draft.content).toHaveLength(1600);
+    });
+
+    it('says nothing when the article fits', async () => {
+      await processor.process(job);
+
+      expect(jobLogText()).not.toContain('WARNING');
     });
   });
 

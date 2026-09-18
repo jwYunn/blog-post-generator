@@ -11,6 +11,7 @@ interface CandidateInput {
   primary_keyword: string;
   search_intent: string | null;
   target_reader: string | null;
+  depth: string | null;
   why_this_topic: string | null;
   outline_preview: string[] | null;
 }

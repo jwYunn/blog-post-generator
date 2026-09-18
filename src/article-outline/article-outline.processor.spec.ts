@@ -3,6 +3,7 @@ import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.
 import { GENERATE_ARTICLE_CONTENT_JOB } from '../article-content/article-content.constants';
 import { ArticleOutlineProcessor } from './article-outline.processor';
 import { ArticleOutline } from './article-outline.types';
+import { ArticleDepth } from '../topic-candidate/enums/article-depth.enum';
 
 const DRAFT_ID = 'draft-1';
 
@@ -74,7 +75,7 @@ describe('ArticleOutlineProcessor', () => {
   it('stores the outline and hands the draft on', async () => {
     await processor.process(job);
 
-    expect(draft.outline).toEqual(OUTLINE);
+    expect(draft.outline).toEqual({ ...OUTLINE, depth: ArticleDepth.STANDARD });
     expect(draft.status).toBe(ArticleDraftStatus.OUTLINE_GENERATED);
     expect(draft.errorMessage).toBeNull();
   });
@@ -90,30 +91,87 @@ describe('ArticleOutlineProcessor', () => {
   });
 
   it('passes what the candidate knows to the model', async () => {
+    draft.topicCandidate.depth = 'brief';
+
     await processor.process(job);
 
-    expect(outlineAiService.generateOutline).toHaveBeenCalledWith(
-      '[Grammar] Present perfect explained',
-      'present perfect',
-      'informational',
-      'Korean beginners',
-      ['a', 'b'],
-    );
+    expect(outlineAiService.generateOutline).toHaveBeenCalledWith({
+      title: '[Grammar] Present perfect explained',
+      keyword: 'present perfect',
+      searchIntent: 'informational',
+      targetReader: 'Korean beginners',
+      outlinePreview: ['a', 'b'],
+      depth: ArticleDepth.BRIEF,
+    });
   });
 
   // A draft whose candidate row went missing should still get an outline
-  it('falls back to nulls when the candidate is gone', async () => {
+  it('falls back to nulls, and standard, when the candidate is gone', async () => {
     draft.topicCandidate = null;
 
     await processor.process(job);
 
-    expect(outlineAiService.generateOutline).toHaveBeenCalledWith(
-      '[Grammar] Present perfect explained',
-      'present perfect',
-      null,
-      null,
-      null,
-    );
+    expect(outlineAiService.generateOutline).toHaveBeenCalledWith({
+      title: '[Grammar] Present perfect explained',
+      keyword: 'present perfect',
+      searchIntent: null,
+      targetReader: null,
+      outlinePreview: null,
+      depth: ArticleDepth.STANDARD,
+    });
+  });
+
+  /**
+   * Every candidate scored before depth existed has none, and the pool is full
+   * of them. They have to come out exactly as they would have.
+   */
+  describe('depth', () => {
+    function jobLogText(): string {
+      return (job.log as jest.Mock).mock.calls
+        .map((call) => call[0])
+        .join('\n');
+    }
+
+    it('builds a candidate with no depth as standard, and says it was not set', async () => {
+      await processor.process(job);
+
+      expect(outlineAiService.generateOutline).toHaveBeenCalledWith(
+        expect.objectContaining({ depth: ArticleDepth.STANDARD }),
+      );
+      expect(jobLogText()).toContain('depth: standard (not set)');
+    });
+
+    // The content stage writes to the length of the outline's depth, so the
+    // depth has to travel with the outline it shaped
+    it('stores the depth on the outline', async () => {
+      draft.topicCandidate.depth = 'brief';
+      outlineAiService.generateOutline.mockResolvedValue({
+        ...OUTLINE,
+        sections: ['What it is', 'When to use it'],
+      });
+
+      await processor.process(job);
+
+      expect(draft.outline.depth).toBe(ArticleDepth.BRIEF);
+    });
+
+    it('warns when a brief outline comes back with a standard shape', async () => {
+      draft.topicCandidate.depth = 'brief';
+
+      await processor.process(job);
+
+      expect(jobLogText()).toContain(
+        'WARNING: a brief outline should have 1-2 sections, got 3',
+      );
+      // Still written: a warning, not a failure
+      expect(draft.status).toBe(ArticleDraftStatus.OUTLINE_GENERATED);
+    });
+
+    it('says nothing when the outline fits its depth', async () => {
+      await processor.process(job);
+
+      expect(jobLogText()).not.toContain('WARNING');
+    });
   });
 
   describe('when the run fails', () => {

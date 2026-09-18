@@ -13,7 +13,8 @@ import {
   EVALUATE_TOPIC_CANDIDATES_JOB,
 } from '../topic-evaluate/topic-evaluate.constants';
 import { EvaluationScope } from '../topic-candidate/enums/evaluation-scope.enum';
-import { jobFailed, jobStep } from '../common/queue/job-log.util';
+import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
+import { ArticleDepth } from '../topic-candidate/enums/article-depth.enum';
 
 interface GenerateJobPayload {
   seedId: string;
@@ -59,6 +60,23 @@ export class TopicGenerateProcessor extends WorkerHost {
         70,
         `model returned ${candidates.length + droppedNonKorean} candidates, ` +
           `${droppedNonKorean} dropped for having no Korean title`,
+      );
+
+      // The split is what shows whether the model is actually choosing, or
+      // marking everything one way - and "undecided" is built as standard
+      const depthCounts = candidates.reduce<Record<string, number>>(
+        (counts, candidate) => {
+          const key = candidate.depth ?? 'undecided';
+          counts[key] = (counts[key] ?? 0) + 1;
+          return counts;
+        },
+        {},
+      );
+      await jobLog(
+        job,
+        `depth: brief ${depthCounts[ArticleDepth.BRIEF] ?? 0}, ` +
+          `standard ${depthCounts[ArticleDepth.STANDARD] ?? 0}, ` +
+          `undecided ${depthCounts.undecided ?? 0}`,
       );
 
       const { saved, skipped } = await this.topicCandidateService.saveMany(

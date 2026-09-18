@@ -95,6 +95,23 @@ describe('TopicGenerateProcessor', () => {
 
   // Duplicates against the same seed are dropped silently by saveMany, so the
   // split is worth recording rather than leaving someone to query for it
+  // A batch marked all one way means the model is not really choosing
+  it('records how the batch split by depth', async () => {
+    aiService.generateCandidates.mockResolvedValue({
+      candidates: [
+        { ...CANDIDATES[0], depth: 'brief' },
+        { ...CANDIDATES[1], depth: 'brief' },
+        { keyword: 'x', title: 'x', depth: 'standard' },
+        { keyword: 'y', title: 'y', depth: null },
+      ],
+      droppedNonKorean: 0,
+    });
+
+    await processor.process(job);
+
+    expect(jobLogText()).toContain('depth: brief 2, standard 1, undecided 1');
+  });
+
   it('records how many candidates were new', async () => {
     candidateService.saveMany.mockResolvedValue({ saved: 1, skipped: 4 });
 

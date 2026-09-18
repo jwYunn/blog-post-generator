@@ -31,13 +31,15 @@ Automated pipeline that turns English vocabulary/grammar seed keywords into publ
          ▼
   [Queue] article-outline
   ArticleOutlineProcessor
-  → GPT-5 generates SEO outline (3 sections + 1–2 FAQs in Korean)
+  → GPT-5 generates SEO outline in Korean, shaped by the candidate's depth
+  → (brief: 1–2 sections; standard: 3 sections + 1–2 FAQs)
   → Draft status: queued → generating_outline → outline_generated
          │
          ▼
   [Queue] article-content
   ArticleContentProcessor
-  → Claude sonnet-4-6 writes full markdown article (~2000 Korean chars)
+  → Claude sonnet-4-6 writes full markdown article, length set by depth
+  → (brief: 800–1,200 Korean chars; standard: 1,800–2,500)
   → Claude haiku-4-5 generates 10 hashtags (parallel)
   → Draft status: outline_generated → generating_content → content_generated
          │

@@ -29,7 +29,7 @@ POST /topic-seeds/:id/generate
 1. Fetches `TopicSeedEntity` with category and existing candidates (for deduplication)
 2. Calls `TopicGenerateAiService` → **Claude Opus 4.5**
    - Prompt includes seed, category, and previously generated titles to avoid repetition
-   - Returns structured JSON: array of `{ title, keyword, score, searchIntent, targetReader, whyThisTopic, outlinePreview }`
+   - Returns structured JSON: array of `{ title, keyword, score, searchIntent, targetReader, depth, whyThisTopic, outlinePreview }`
 3. Saves each item as a `TopicCandidateEntity` (status: `pending`)
 4. Increments `usedCount` and updates `lastUsedAt` on the seed
 
@@ -73,7 +73,7 @@ A `TopicCandidateEntity` has a 1:1 unique constraint with `ArticleDraftEntity`, 
 
 **Processor: `ArticleOutlineProcessor`** (concurrency: 3)
 
-1. Fetches draft + associated candidate (for `searchIntent`, `targetReader`, `outlinePreview`)
+1. Fetches draft + associated candidate (for `searchIntent`, `targetReader`, `outlinePreview`, `depth`)
 2. Sets draft status → `generating_outline`
 3. Calls `ArticleOutlineAiService` → **GPT-5**
    - Input: title, keyword, search intent, target reader, AI-suggested outline preview
@@ -92,7 +92,7 @@ Two AI calls run in parallel:
 
 **Content** — `ArticleContentAiService` → **Claude Sonnet 4.6**
 - Input: full outline (title, sections, FAQs), keyword, search intent, target reader
-- Output: complete Korean blog post in Markdown (~1800–2500 characters)
+- Output: complete Korean blog post in Markdown — 800–1,200 characters for a brief outline, 1,800–2,500 for standard
 - Structured to match the outline sections
 
 **Hashtags** — same service → **Claude Haiku 4.5**
@@ -166,7 +166,7 @@ POST /article-drafts/:id/publish  { "mode": "now" | "schedule", "scheduledAt"?: 
 | Stage | Key Fields Set |
 |---|---|
 | Seed created | `seed`, `category`, `priority`, `isActive` |
-| Candidates generated | `title`, `keyword`, `score`, `searchIntent`, `targetReader`, `outlinePreview` |
+| Candidates generated | `title`, `keyword`, `score`, `searchIntent`, `targetReader`, `depth`, `outlinePreview` |
 | Candidates evaluated | `overallScore`, `rank`, `strengths`, `weaknesses`, `verdict`, `evaluationDetail` |
 | Draft created | `topicCandidateId`, `title`, `keyword`, status=`queued` |
 | Outline generated | `outline` (JSONB) |

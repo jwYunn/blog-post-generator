@@ -26,8 +26,21 @@ Each item must include:
 - primary_keyword: main keyword
 - search_intent: one of [informational, comparison, how-to, mistake-fix]
 - target_reader: beginner / intermediate / advanced
+- depth: brief / standard - see Depth below
 - why_this_topic: why this topic is valuable (1 sentence)
-- outline_preview: 3 bullet points (short)
+- outline_preview: 1 or 2 bullet points for a brief topic, 3 for a standard one (short)
+
+## Depth
+How much the searcher needs in order to be satisfied - not how advanced they
+are. A beginner question can need several sections; an advanced one can be
+answered in one.
+- brief: one expression with one core meaning or use. The whole answer fits in
+  one or two short sections - e.g. "수고하셨습니다 영어로", "otherwise 품사"
+- standard: several meanings to separate, or two expressions to compare -
+  e.g. "otherwise 뜻과 사용법", "adapt vs adopt 차이"
+- Do not mark a topic standard to make it look substantial. A short article
+  that fully answers one question is the better post; padding it out to a
+  longer length is what this field exists to stop
 
 ## Important
 - Be specific, not generic

@@ -33,8 +33,9 @@ All queues use **BullMQ** backed by Redis. The Bull Board dashboard is available
 ### Processor Steps
 1. Fetch `TopicSeed` by `seedId`
 2. Call `TopicGenerateAiService.generateCandidates(seed.seed)` → array of candidate payloads
-3. Call `TopicCandidateService.saveMany(seedId, candidates)` → bulk insert (skip duplicates)
-4. Call `TopicSeedService.incrementUsedCount(seedId)`
+3. Log how the batch split by depth — all one way means the model is not choosing
+4. Call `TopicCandidateService.saveMany(seedId, candidates)` → bulk insert (skip duplicates)
+5. Call `TopicSeedService.incrementUsedCount(seedId)`
 
 ### Output
 Creates N `TopicCandidate` rows (status=`pending`) linked to the seed.
@@ -68,7 +69,7 @@ ask for it, via `?scope=all`.
 
 ### Processor Steps
 1. Fetch the seed's `TopicCandidate` rows in `scope` (`pending` unless told otherwise)
-2. Build candidate input array with: id, title, keyword, searchIntent, targetReader, whyThisTopic, outlinePreview
+2. Build candidate input array with: id, title, keyword, searchIntent, targetReader, depth, whyThisTopic, outlinePreview
 3. Fetch the titles this seed has already been turned into articles under
 4. Call `TopicEvaluateAiService.evaluateCandidates(candidates, coveredTitles)` → evaluation results
 5. Call `TopicCandidateService.saveEvaluations(evaluations)` → bulk update
@@ -110,10 +111,14 @@ Updates each `TopicCandidate` with: `overallScore`, `rank`, `strengths`, `weakne
 ### Processor Steps
 1. Fetch `ArticleDraft` with relation `topicCandidate`
 2. Set draft `status = generating_outline`
-3. Call `ArticleOutlineAiService.generateOutline(title, keyword, searchIntent, targetReader, outlinePreview)`
-4. Save outline JSON to `draft.outline`, set `status = outline_generated`
-5. Enqueue `generate-article-content` job with `articleDraftId`
-6. On error: set `status = failed`, save `errorMessage`
+3. Resolve the candidate's depth — null or unknown is standard, and the log says
+   when it was not set
+4. Call `ArticleOutlineAiService.generateOutline({ title, keyword, searchIntent, targetReader, outlinePreview, depth })`
+5. Log a warning when the section count falls outside the depth's range — the
+   article is still written, but a model ignoring depth is what would cram it
+6. Save outline JSON with `depth` added to `draft.outline`, set `status = outline_generated`
+7. Enqueue `generate-article-content` job with `articleDraftId`
+8. On error: set `status = failed`, save `errorMessage`
 
 ### Output
 Saves `ArticleOutline` object to `draft.outline`:
@@ -122,8 +127,9 @@ Saves `ArticleOutline` object to `draft.outline`:
   title: string
   keyword: string
   searchIntent: string
-  sections: string[]   // exactly 3 items, in Korean
-  faqs: string[]       // 1–2 items, in Korean
+  sections: string[]   // 1–2 for brief, 3 for standard, in Korean
+  faqs: string[]       // 0–1 for brief, 1–2 for standard, in Korean
+  depth: ArticleDepth  // the depth it was built for
 }
 ```
 
@@ -144,13 +150,15 @@ Saves `ArticleOutline` object to `draft.outline`:
 ### Processor Steps
 1. Fetch `ArticleDraft`
 2. Validate `draft.outline` exists
-3. Set `status = generating_content`
-4. In parallel:
-   - `ArticleContentAiService.generateContent(title, keyword, outline)` → markdown string
+3. Take depth from the outline (absent → standard), and with it the target length
+4. Set `status = generating_content`
+5. In parallel:
+   - `ArticleContentAiService.generateContent({ title, keyword, outline, depth })` → markdown string
    - `ArticleContentAiService.generateHashtags(title, keyword)` → string[]
-5. Save `draft.content` and `draft.hashtags`, set `status = content_generated`
-6. Enqueue `generate-article-thumbnail` job
-7. On error: set `status = failed`, save `errorMessage`
+6. Log the length against the depth's target, and a warning past its hard maximum
+7. Save `draft.content` and `draft.hashtags`, set `status = content_generated`
+8. Enqueue `generate-article-thumbnail` job
+9. On error: set `status = failed`, save `errorMessage`
 
 ---
 

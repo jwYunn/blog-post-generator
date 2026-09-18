@@ -14,6 +14,8 @@ Each candidate contains:
 - primary_keyword
 - search_intent
 - target_reader
+- depth: "brief" or "standard" - how long the article is meant to be. Null
+  means standard
 - why_this_topic
 - outline_preview
 
@@ -56,8 +58,13 @@ Score each candidate from 1 to 10 for the following:
 - Prefer topics that solve a real confusion or need
 
 6. outline_feasibility
-- Can this topic be explained clearly in one blog post based on the outline preview?
-- Penalize topics that feel too thin or too hard to structure
+- Can this topic be explained clearly in one blog post of its depth, based on
+  the outline preview?
+- A brief topic is meant to be one or two short sections answering a single
+  question, and its preview has one or two points. That is its shape, not
+  thinness - do not mark it down for being short
+- Penalize a topic that is thin even for its depth, one marked brief that
+  plainly needs more room, or one too hard to structure
 
 7. uniqueness
 - Is this candidate meaningfully different from the others in the same input list?
@@ -90,7 +97,9 @@ overall_score =
 - Be strict and consistent
 - Prefer clear, practical, searchable topics over clever but vague ones
 - Penalize duplicate or near-duplicate candidates
-- Penalize topics that are too broad, too generic, or too weak for a full post
+- Penalize topics that are too broad, too generic, or too weak to answer a real
+  question. Short is not weak: a brief topic that fully answers one question is
+  a complete post
 - Use decimal scores if needed
 - Keep reasoning concise but useful
 

@@ -8,11 +8,13 @@ import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.
 import { ArticleOutline } from '../article-outline/article-outline.types';
 import { ArticleContentAiService } from './article-content-ai.service';
 import { ARTICLE_CONTENT_QUEUE } from './article-content.constants';
+import { CONTENT_LENGTHS, formatCharCount } from './article-content-prompt';
 import {
   ARTICLE_THUMBNAIL_QUEUE,
   GENERATE_ARTICLE_THUMBNAIL_JOB,
 } from '../article-thumbnail/article-thumbnail.constants';
-import { jobFailed, jobStep } from '../common/queue/job-log.util';
+import { jobFailed, jobLog, jobStep } from '../common/queue/job-log.util';
+import { resolveArticleDepth } from '../common/utils/article-depth.util';
 
 interface ArticleContentJobPayload {
   articleDraftId: string;
@@ -48,11 +50,15 @@ export class ArticleContentProcessor extends WorkerHost {
     }
 
     const outline = draft.outline as unknown as ArticleOutline;
+    // Taken from the outline rather than the candidate: the article is written
+    // to the length of the structure it is actually given
+    const depth = resolveArticleDepth(outline.depth);
+    const length = CONTENT_LENGTHS[depth];
     await jobStep(
       job,
       10,
       `draft ${draft.id} "${draft.title}" - outline has ` +
-        `${outline.sections.length} sections`,
+        `${outline.sections.length} sections, depth ${depth}`,
     );
 
     draft.status = ArticleDraftStatus.GENERATING_CONTENT;
@@ -62,7 +68,9 @@ export class ArticleContentProcessor extends WorkerHost {
       await jobStep(
         job,
         20,
-        'calling claude-sonnet-4-6 (content) and claude-haiku-4-5 (hashtags) in parallel',
+        `calling claude-sonnet-4-6 (content, ${formatCharCount(length.min)}-` +
+          `${formatCharCount(length.max)} chars) and claude-haiku-4-5 ` +
+          `(hashtags) in parallel`,
       );
 
       const [content, hashtags] = await Promise.all([
@@ -70,6 +78,7 @@ export class ArticleContentProcessor extends WorkerHost {
           title: draft.title,
           keyword: draft.keyword,
           outline,
+          depth,
         }),
         this.articleContentAiService.generateHashtags({
           title: draft.title,
@@ -77,13 +86,22 @@ export class ArticleContentProcessor extends WorkerHost {
         }),
       ]);
 
-      // Length is the one number worth keeping: the prompt targets 1,800-2,500
-      // Korean characters, so a run that drifts shows up here first.
+      // Length is the one number worth keeping: each depth has a target, so a
+      // run that drifts shows up here first.
       await jobStep(
         job,
         80,
-        `content: ${content.length} chars, hashtags: ${hashtags.length}`,
+        `content: ${content.length} chars (${depth} target ` +
+          `${formatCharCount(length.min)}-${formatCharCount(length.max)}), ` +
+          `hashtags: ${hashtags.length}`,
       );
+      if (content.length > length.hardMax) {
+        await jobLog(
+          job,
+          `WARNING: ${content.length} chars is over the ${depth} ceiling of ` +
+            `${formatCharCount(length.hardMax)}`,
+        );
+      }
 
       draft.content = content;
       draft.hashtags = hashtags;

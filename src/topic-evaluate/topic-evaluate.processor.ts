@@ -66,6 +66,9 @@ export class TopicEvaluateProcessor extends WorkerHost {
         primary_keyword: c.keyword,
         search_intent: c.searchIntent,
         target_reader: c.targetReader,
+        // Without it a brief candidate's one-point preview reads as thin, and
+        // gets marked down below the score the scheduler draws from
+        depth: c.depth,
         why_this_topic: c.whyThisTopic,
         outline_preview: c.outlinePreview,
       }));

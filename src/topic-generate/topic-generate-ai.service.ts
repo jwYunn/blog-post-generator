@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { TOPIC_GENERATE_PROMPT } from './topic-generate-prompt';
 import type { CandidatePayload } from '../topic-candidate/topic-candidate.service';
 import { containsKorean } from '../common/utils/title.util';
+import { parseArticleDepth } from '../common/utils/article-depth.util';
 import { parseJsonArrayResponse } from '../common/utils/ai-json.util';
 
 interface AiCandidateItem {
@@ -11,6 +12,7 @@ interface AiCandidateItem {
   primary_keyword: string;
   search_intent: string;
   target_reader: string;
+  depth?: string;
   why_this_topic: string;
   outline_preview: string[];
 }
@@ -78,6 +80,7 @@ export class TopicGenerateAiService {
         outlinePreview: Array.isArray(item.outline_preview)
           ? item.outline_preview
           : null,
+        depth: parseArticleDepth(item.depth),
       })),
     };
   }
