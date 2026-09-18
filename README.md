@@ -25,7 +25,7 @@ All intermediate states are persisted in PostgreSQL, making the pipeline resumab
 
 | Layer | Technology |
 |---|---|
-| Framework | NestJS 10 + TypeScript 5 |
+| Framework | NestJS 11 + TypeScript 6 |
 | Queue / Jobs | BullMQ 5 + Redis 7 |
 | Database | PostgreSQL 16 + TypeORM 0.3 |
 | AI — Text | Anthropic Claude (Opus, Sonnet, Haiku), OpenAI GPT-4o / GPT-5 |

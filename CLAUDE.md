@@ -4,7 +4,7 @@ NestJS backend that automates blog post creation from keyword seeds through AI g
 
 ## Tech Stack
 
-- **Framework**: NestJS 10 + TypeScript
+- **Framework**: NestJS 11 + TypeScript
 - **Database**: PostgreSQL + TypeORM 0.3
 - **Queue**: BullMQ + Redis
 - **AI**: Anthropic Claude, OpenAI GPT, Replicate (image)
