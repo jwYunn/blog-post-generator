@@ -10,8 +10,7 @@ import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticlePublishRecordStatus } from './enums/article-publish-record-status.enum';
 
 export type PublishSchedule =
-  | { mode: 'now' }
-  | { mode: 'schedule'; scheduledAt: string };
+  { mode: 'now' } | { mode: 'schedule'; scheduledAt: string };
 
 @Entity('article_publish_records')
 export class ArticlePublishRecordEntity {
