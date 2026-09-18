@@ -165,7 +165,8 @@ export class TopicCandidateService {
       qb.andWhere('tc.score <= :maxScore', { maxScore });
     }
 
-    qb.orderBy(`tc.${sortBy}`, sortOrder);
+    // id makes the order total - OFFSET paging over tied values can repeat or skip rows
+    qb.orderBy(`tc.${sortBy}`, sortOrder).addOrderBy('tc.id', sortOrder);
     qb.skip((page - 1) * limit).take(limit);
 
     const [candidates, total] = await qb.getManyAndCount();

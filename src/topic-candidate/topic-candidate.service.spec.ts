@@ -3,6 +3,10 @@ import { In } from 'typeorm';
 import { ArticleDraftEntity } from '../article-draft/article-draft.entity';
 import { ArticleDraftStatus } from '../article-draft/enums/article-draft-status.enum';
 import { GENERATE_ARTICLE_OUTLINE_JOB } from '../article-outline/article-outline.constants';
+import {
+  CandidateSortBy,
+  CandidateSortOrder,
+} from './dto/query-topic-candidate-list.dto';
 import { AllowedCandidateStatus } from './dto/update-topic-candidate-status.dto';
 import { TopicCandidateStatus } from './enums/topic-candidate-status.enum';
 import { EvaluationScope } from './enums/evaluation-scope.enum';
@@ -236,11 +240,13 @@ describe('TopicCandidateService', () => {
       const qb = {
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         getManyAndCount: jest.fn(async () => [candidates, candidates.length]),
       };
       candidateRepository.createQueryBuilder = jest.fn(() => qb);
+      return qb;
     }
 
     beforeEach(() => {
@@ -267,6 +273,19 @@ describe('TopicCandidateService', () => {
         [CANDIDATE_ID, DRAFT_ID],
         ['candidate-2', null],
       ]);
+    });
+
+    // Unscored candidates all tie on overallScore, which is where pages overlapped
+    it('breaks ties on the sort column by id', async () => {
+      const qb = stubPage([]);
+
+      await service.findAll({
+        sortBy: CandidateSortBy.OVERALL_SCORE,
+        sortOrder: CandidateSortOrder.DESC,
+      });
+
+      expect(qb.orderBy).toHaveBeenCalledWith('tc.overallScore', 'DESC');
+      expect(qb.addOrderBy).toHaveBeenCalledWith('tc.id', 'DESC');
     });
 
     it('skips the draft lookup for an empty page', async () => {

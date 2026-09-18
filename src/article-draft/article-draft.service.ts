@@ -111,7 +111,8 @@ export class ArticleDraftService {
       qb.andWhere('ad.status = :status', { status });
     }
 
-    qb.orderBy(`ad.${sortBy}`, sortOrder);
+    // id makes the order total - OFFSET paging over tied values can repeat or skip rows
+    qb.orderBy(`ad.${sortBy}`, sortOrder).addOrderBy('ad.id', sortOrder);
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();
