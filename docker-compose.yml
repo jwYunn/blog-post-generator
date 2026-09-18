@@ -120,7 +120,13 @@ services:
     # has to let BullMQ finish rather than kill the process mid-post. Paired with
     # enableShutdownHooks() in main.ts - without that, SIGTERM is ignored and
     # this grace period buys nothing.
-    stop_grace_period: 60s
+    #
+    # Sized to the longest publish there can be: browserless ends a session at
+    # its TIMEOUT (10 min, above), connecting can take 30s before that, and the
+    # job then only saves two rows. Raise the two together. A deploy that lands
+    # mid-publish waits this long for the old container, with the API down
+    # meanwhile, so the deploy step's command_timeout in deploy.yml covers it.
+    stop_grace_period: 12m
     restart: unless-stopped
 
   nginx:

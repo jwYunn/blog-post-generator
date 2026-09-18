@@ -93,7 +93,9 @@ jobs:
     name: Deploy to VPS
     needs: build-and-push
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Above the deploy step's command_timeout, so the step's own limit is the
+    # one that fires
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -126,6 +128,11 @@ jobs:
           key: ${{ secrets.CONTABO_SSH_KEY }}
           port: ${{ secrets.CONTABO_PORT }}
           envs: APP_IMAGE
+          # `up -d` waits out the old app's stop_grace_period (12m) when a
+          # publish is running, and the health checks follow it. The action's
+          # 10m default would cut the session mid-`up`, which can leave the old
+          # container stopped and no new one started in its place.
+          command_timeout: 25m
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
