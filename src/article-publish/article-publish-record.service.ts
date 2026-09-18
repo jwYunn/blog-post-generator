@@ -28,7 +28,9 @@ export class ArticlePublishRecordService {
     const qb = this.recordRepository
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.draft', 'draft')
+      // id makes the order total - OFFSET paging over tied values can repeat or skip rows
       .orderBy('r.createdAt', 'DESC')
+      .addOrderBy('r.id', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -59,7 +61,9 @@ export class ArticlePublishRecordService {
       .createQueryBuilder('r')
       .leftJoinAndSelect('r.draft', 'draft')
       .where('r.draftId = :draftId', { draftId })
+      // id makes the order total - OFFSET paging over tied values can repeat or skip rows
       .orderBy('r.createdAt', 'DESC')
+      .addOrderBy('r.id', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 

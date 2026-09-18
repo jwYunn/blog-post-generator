@@ -96,7 +96,9 @@ export class TopicSeedService {
       qb.andWhere('ts.seed ILIKE :search', { search: `%${search}%` });
     }
 
-    qb.orderBy(`ts.${sortBy}`, order.toUpperCase() as 'ASC' | 'DESC');
+    const direction = order.toUpperCase() as 'ASC' | 'DESC';
+    // id makes the order total - OFFSET paging over tied values can repeat or skip rows
+    qb.orderBy(`ts.${sortBy}`, direction).addOrderBy('ts.id', direction);
     qb.skip((page - 1) * limit).take(limit);
 
     const [data, total] = await qb.getManyAndCount();

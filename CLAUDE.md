@@ -41,6 +41,9 @@ Read these files to understand the system before suggesting features or changes:
 - Environment variables are loaded via `ConfigService` — never access `process.env` directly
 - Every queue processor records its progress on the job itself, not only to the
   Nest logger — see Queue Logging below
+- Every paginated list orders by `id` after its sort column. Sort values tie
+  (seeds created in the same instant, candidates with no score yet), and OFFSET
+  paging over ties is free to repeat a row on one page and skip it on the next
 
 ## Queue Logging
 

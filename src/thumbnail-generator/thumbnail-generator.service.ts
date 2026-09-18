@@ -58,7 +58,8 @@ export class ThumbnailGeneratorService {
   async findAll(query: QueryThumbnailPromptsDto) {
     const { page = 1, limit = 20 } = query;
     const [data, total] = await this.promptRepo.findAndCount({
-      order: { createdAt: 'DESC' },
+      // id makes the order total - OFFSET paging over tied values can repeat or skip rows
+      order: { createdAt: 'DESC', id: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
