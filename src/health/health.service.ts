@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnApplicationShutdown } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -16,7 +16,7 @@ export interface HealthReport {
 }
 
 @Injectable()
-export class HealthService implements OnModuleDestroy {
+export class HealthService implements OnApplicationShutdown {
   private readonly redis: Redis;
 
   constructor(
@@ -70,7 +70,10 @@ export class HealthService implements OnModuleDestroy {
     }
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // Not onModuleDestroy: that runs while the HTTP server is still accepting
+  // requests, and a probe landing then would report a healthy Redis as down.
+  // Nest closes the server before it runs onApplicationShutdown.
+  async onApplicationShutdown(): Promise<void> {
     try {
       await this.redis.quit();
     } catch {

@@ -1,3 +1,4 @@
+import { OnApplicationShutdown } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -28,7 +29,10 @@ interface ArticlePublishJobPayload {
 // - is otherwise re-queued once by default. That job may already have posted the
 // article, so it fails outright instead and is left for a human to check.
 @Processor(ARTICLE_PUBLISH_QUEUE, { concurrency: 1, maxStalledCount: 0 })
-export class ArticlePublishProcessor extends WorkerHost {
+export class ArticlePublishProcessor
+  extends WorkerHost
+  implements OnApplicationShutdown
+{
   constructor(
     @InjectRepository(ArticleDraftEntity)
     private readonly draftRepository: Repository<ArticleDraftEntity>,
@@ -38,6 +42,18 @@ export class ArticlePublishProcessor extends WorkerHost {
     private readonly configService: ConfigService,
   ) {
     super();
+  }
+
+  /**
+   * A publish still running on SIGTERM needs the session store until it ends,
+   * so the worker drains before the store closes. Hook order cannot be relied
+   * on for this: @nestjs/bullmq closes workers from a global module, which Nest
+   * 11 shuts down after this one. BullExplorer closes this worker again later,
+   * and Worker.close() hands back the same promise the second time.
+   */
+  async onApplicationShutdown(): Promise<void> {
+    await this.worker.close();
+    await this.tistorySessionService.close();
   }
 
   async process(job: Job<ArticlePublishJobPayload>): Promise<void> {

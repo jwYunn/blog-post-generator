@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { TistorySessionProvider } from './tistory.types';
@@ -7,9 +7,7 @@ const TISTORY_SESSION_KEY = 'tistory:session';
 const SESSION_TTL_SECONDS = 86_400; // 24 hours
 
 @Injectable()
-export class TistorySessionService
-  implements TistorySessionProvider, OnModuleDestroy
-{
+export class TistorySessionService implements TistorySessionProvider {
   private readonly redis: Redis;
 
   constructor(private readonly configService: ConfigService) {
@@ -38,7 +36,19 @@ export class TistorySessionService
     await this.redis.del(TISTORY_SESSION_KEY);
   }
 
-  async onModuleDestroy(): Promise<void> {
-    await this.redis.quit();
+  /**
+   * Called by ArticlePublishProcessor once its worker has drained, rather than
+   * from a lifecycle hook here: a publish still running on SIGTERM needs this
+   * store until it ends, and no hook on this class reliably runs after
+   * @nestjs/bullmq has closed its workers.
+   */
+  async close(): Promise<void> {
+    try {
+      await this.redis.quit();
+    } catch {
+      // Redis was already unreachable - drop the socket instead. Throwing here
+      // would abort the rest of Nest's shutdown, other workers' drain included.
+      this.redis.disconnect();
+    }
   }
 }
