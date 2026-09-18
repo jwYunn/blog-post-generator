@@ -147,7 +147,9 @@ POST /article-drafts/:id/publish  { "mode": "now" | "schedule", "scheduledAt"?: 
 2. Calls `runTistoryPublish()` with Playwright:
    - Connects to the remote browser at `BROWSERLESS_URL` via `chromium.connect()`
    - Navigates to Kakao login page
-   - Enters credentials; waits for mobile auth approval (up to 5 minutes)
+   - Enters credentials; clicks through Kakao's confirm step when it is shown
+   - Goes to the blog's manage page itself from wherever Tistory ends the login
+     round trip (sometimes the Tistory home page rather than the manage page)
    - Navigates to Tistory blog editor
    - Selects category matching the topic seed's category via `aria-label`
    - Inserts thumbnail as `<img>` HTML at the top of the editor

@@ -82,6 +82,9 @@ const sessionProvider = {
       process.env.KAKAO_ID,
       process.env.KAKAO_PASSWORD,
       blogName,
+      // The same milestones a publish job records - which branch Kakao took,
+      // and where Tistory ended the round trip
+      async (message) => console.log(`  ${message}`),
     );
     console.log('RESULT: 로그인 성공 - manage 페이지 도달');
     const state = await context.storageState();

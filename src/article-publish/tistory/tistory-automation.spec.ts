@@ -1,4 +1,11 @@
-import { buildHtmlContent, markdownToHtml } from './tistory-automation';
+import { Page } from 'playwright-core';
+import {
+  buildHtmlContent,
+  isBackOnTistory,
+  isManagePage,
+  kakaoLogin,
+  markdownToHtml,
+} from './tistory-automation';
 import { TistoryDraftData } from './tistory.types';
 
 const THUMBNAIL = 'https://cdn.example.com/thumb.png';
@@ -112,5 +119,197 @@ describe('buildHtmlContent, escaping attribute values', () => {
     const html = buildHtmlContent(buildDraft({ thumbnailImageUrl: THUMBNAIL }));
 
     expect(altAttribute(html)).toBe('Present perfect explained');
+  });
+});
+
+describe('isBackOnTistory', () => {
+  const back = (url: string) => isBackOnTistory(new URL(url));
+
+  it('accepts the manage page and the Tistory home page alike', () => {
+    expect(back('https://myblog.tistory.com/manage')).toBe(true);
+    expect(back('https://www.tistory.com/')).toBe(true);
+  });
+
+  // The OAuth callback lives under /auth; landing there means Tistory has not
+  // finished with the login yet.
+  it('rejects the Tistory auth routes', () => {
+    expect(back('https://www.tistory.com/auth/login?redirectUrl=x')).toBe(
+      false,
+    );
+    expect(back('https://www.tistory.com/auth/kakao/redirect?code=x')).toBe(
+      false,
+    );
+  });
+
+  it('rejects Kakao, even with a Tistory address in its query string', () => {
+    expect(
+      back(
+        'https://accounts.kakao.com/login?continue=https://www.tistory.com/',
+      ),
+    ).toBe(false);
+  });
+
+  it('rejects a lookalike domain', () => {
+    expect(back('https://nottistory.com/')).toBe(false);
+  });
+});
+
+describe('isManagePage', () => {
+  it('matches only the named blog', () => {
+    expect(
+      isManagePage(new URL('https://myblog.tistory.com/manage'), 'myblog'),
+    ).toBe(true);
+    expect(
+      isManagePage(new URL('https://other.tistory.com/manage'), 'myblog'),
+    ).toBe(false);
+    expect(isManagePage(new URL('https://www.tistory.com/'), 'myblog')).toBe(
+      false,
+    );
+  });
+});
+
+describe('kakaoLogin', () => {
+  const BLOG = 'myblog';
+  const MANAGE = `https://${BLOG}.tistory.com/manage`;
+  const TISTORY_HOME = 'https://www.tistory.com/';
+  const TISTORY_LOGIN = `https://www.tistory.com/auth/login?redirectUrl=${MANAGE}`;
+  const KAKAO_BUTTON = 'a.btn_login.link_kakao_id';
+  const SUBMIT = 'button[type="submit"].btn_g.highlight.submit';
+  const CONFIRM = 'button[type="submit"].btn_g.btn_confirm';
+
+  interface Scenario {
+    /** What submitting the credentials shows: the confirm step, or a URL */
+    afterSubmit: 'confirm' | string;
+    /** Where Kakao hands back to once the confirm step is clicked */
+    afterConfirm?: string;
+    /** Where a visit to the manage page ends up */
+    manageGoesTo: string;
+  }
+
+  /**
+   * Just enough of a Playwright page to walk kakaoLogin through Kakao's
+   * outcomes. Waits resolve when the scenario's navigation satisfies them and
+   * otherwise stay pending, which is how a race loser behaves.
+   */
+  class FakeLoginPage {
+    private current = TISTORY_LOGIN;
+    private confirmShown = false;
+    private waiters: Array<() => void> = [];
+    readonly visited: string[] = [];
+
+    constructor(private readonly scenario: Scenario) {}
+
+    url(): string {
+      return this.current;
+    }
+
+    async click(selector: string): Promise<void> {
+      if (selector === KAKAO_BUTTON) {
+        this.navigate('https://accounts.kakao.com/login?continue=x');
+      } else if (selector === SUBMIT) {
+        if (this.scenario.afterSubmit === 'confirm') {
+          this.confirmShown = true;
+          this.notify();
+        } else {
+          this.navigate(this.scenario.afterSubmit);
+        }
+      } else if (selector === CONFIRM) {
+        this.confirmShown = false;
+        this.navigate(this.scenario.afterConfirm!);
+      }
+    }
+
+    async type(): Promise<void> {}
+
+    async waitForTimeout(): Promise<void> {}
+
+    async waitForSelector(selector: string): Promise<void> {
+      if (selector === CONFIRM) await this.until(() => this.confirmShown);
+    }
+
+    async waitForURL(matches: (url: URL) => boolean): Promise<void> {
+      await this.until(() => matches(new URL(this.current)));
+    }
+
+    async goto(url: string): Promise<void> {
+      this.visited.push(url);
+      this.navigate(url === MANAGE ? this.scenario.manageGoesTo : url);
+    }
+
+    private navigate(url: string): void {
+      this.current = url;
+      this.notify();
+    }
+
+    private until(condition: () => boolean): Promise<void> {
+      return new Promise((resolve) => {
+        const check = () =>
+          condition() ? resolve() : void this.waiters.push(check);
+        check();
+      });
+    }
+
+    private notify(): void {
+      const pending = this.waiters;
+      this.waiters = [];
+      pending.forEach((check) => check());
+    }
+  }
+
+  async function login(scenario: Scenario) {
+    const page = new FakeLoginPage(scenario);
+    const progress: string[] = [];
+    const result = kakaoLogin(
+      page as unknown as Page,
+      'id',
+      'password',
+      BLOG,
+      async (message) => void progress.push(message),
+    );
+    return { page, progress, result };
+  }
+
+  // The production failure: Kakao showed its confirm step, and once it was
+  // clicked Tistory ended the round trip on its home page. The flow waited 30s
+  // there for the manage page to arrive on its own and failed the publish.
+  it('goes to the manage page itself when the confirm step lands on the Tistory home page', async () => {
+    const { page, progress, result } = await login({
+      afterSubmit: 'confirm',
+      afterConfirm: TISTORY_HOME,
+      manageGoesTo: MANAGE,
+    });
+
+    await expect(result).resolves.toBeUndefined();
+    expect(page.visited).toEqual([MANAGE]);
+    expect(page.url()).toBe(MANAGE);
+    expect(progress).toContain(
+      'Kakao confirm step presented - clicking through',
+    );
+    expect(progress.some((line) => line.includes(TISTORY_HOME))).toBe(true);
+  });
+
+  it('does not navigate again when Kakao returns straight to the manage page', async () => {
+    const { page, progress, result } = await login({
+      afterSubmit: MANAGE,
+      manageGoesTo: MANAGE,
+    });
+
+    await expect(result).resolves.toBeUndefined();
+    expect(page.visited).toEqual([]);
+    expect(progress).toContain(
+      'Kakao login returned straight to the manage page',
+    );
+  });
+
+  it('fails, naming where it stopped, when the manage page bounces back to login', async () => {
+    const { result } = await login({
+      afterSubmit: 'confirm',
+      afterConfirm: TISTORY_HOME,
+      manageGoesTo: TISTORY_LOGIN,
+    });
+
+    await expect(result).rejects.toThrow(
+      /login did not take\. Stopped at: https:\/\/www\.tistory\.com\/auth\/login/,
+    );
   });
 });

@@ -34,8 +34,8 @@ const CONNECT_TIMEOUT_MS = 30_000;
  */
 const POST_SUBMIT_TIMEOUT_MS = 60_000;
 
-/** Budget for the redirect chain that follows the interstitial */
-const MANAGE_TIMEOUT_MS = 30_000;
+/** Budget for Kakao to hand back to Tistory once the interstitial is confirmed */
+const REDIRECT_TIMEOUT_MS = 30_000;
 
 // ─── Browser acquisition ────────────────────────────────────────────────────
 
@@ -128,13 +128,43 @@ export async function humanType(
 
 // ─── Kakao login ────────────────────────────────────────────────────────────
 
+/**
+ * Whether a URL is back on Tistory after the Kakao round trip: any Tistory page
+ * outside the auth routes the OAuth callback passes through.
+ *
+ * Only the domain is held to, not the page, because Tistory picks where the
+ * round trip ends. It usually returns to the manage page that sent the login
+ * off, but after Kakao's confirm step it has been seen landing on its own home
+ * page instead - and waiting there for the manage page failed the publish.
+ */
+export function isBackOnTistory(url: URL): boolean {
+  const onTistory =
+    url.hostname === 'tistory.com' || url.hostname.endsWith('.tistory.com');
+  return onTistory && !url.pathname.startsWith('/auth');
+}
+
+/** Whether a URL is inside the given blog's manage area */
+export function isManagePage(url: URL, blogName: string): boolean {
+  return (
+    url.hostname === `${blogName}.tistory.com` &&
+    url.pathname.startsWith('/manage')
+  );
+}
+
 /** Log in with a Kakao account and land on the Tistory manage page */
 export async function kakaoLogin(
   page: Page,
   kakaoId: string,
   kakaoPassword: string,
   blogName: string,
+  /** Sink for the milestones a publish job records on itself */
+  onProgress?: (message: string) => Promise<void>,
 ): Promise<void> {
+  const report = async (message: string): Promise<void> => {
+    logger.log(message);
+    if (onProgress) await onProgress(message);
+  };
+
   // 1. Click "Login with Kakao account" button
   logger.log('Clicking Kakao login button');
   await page.waitForSelector('a.btn_login.link_kakao_id', { timeout: 10_000 });
@@ -156,28 +186,30 @@ export async function kakaoLogin(
   await page.waitForTimeout(preClickDelay);
 
   // 6. Click login button
-  logger.log('Clicking login button');
+  await report(
+    `Submitting Kakao credentials - waiting up to ` +
+      `${POST_SUBMIT_TIMEOUT_MS / 1000}s for Kakao to answer`,
+  );
   await page.click('button[type="submit"].btn_g.highlight.submit');
 
-  // 7. Submitting leads to one of two places: straight through to the manage
-  // page, or an interstitial that has to be confirmed first. Kakao decides
-  // which, and takes a varying amount of time about it.
+  // 7. Submitting leads to one of two places: straight back to Tistory, or an
+  // interstitial that has to be confirmed first. Kakao decides which, and takes
+  // a varying amount of time about it.
   //
   // Waiting a fixed budget for the interstitial and treating its absence as
   // "already past it" conflated two different situations - a step that was
   // never shown, and one that had not rendered yet. A slow response then fell
-  // through to the manage-page wait with the interstitial still on screen and
-  // nothing left to click it. Racing the two outcomes drops the assumption
-  // about ordering and timing alike; whichever arrives first is the answer.
+  // through to the next wait with the interstitial still on screen and nothing
+  // left to click it. Racing the two outcomes drops the assumption about
+  // ordering and timing alike; whichever arrives first is the answer.
   const confirmButton = 'button[type="submit"].btn_g.btn_confirm';
-  const managePattern = `**//${blogName}.tistory.com/manage**`;
 
   // Both branches swallow their own timeout so the loser cannot surface as an
   // unhandled rejection once the race has already settled.
   const outcome = await Promise.race([
     page
-      .waitForURL(managePattern, { timeout: POST_SUBMIT_TIMEOUT_MS })
-      .then(() => 'manage' as const)
+      .waitForURL(isBackOnTistory, { timeout: POST_SUBMIT_TIMEOUT_MS })
+      .then(() => 'returned' as const)
       .catch(() => null),
     page
       .waitForSelector(confirmButton, { timeout: POST_SUBMIT_TIMEOUT_MS })
@@ -189,18 +221,44 @@ export async function kakaoLogin(
     // Naming the landing spot matters: an additional-auth screen and a changed
     // selector both stall here, and the URL is what tells them apart.
     throw new Error(
-      `Kakao login reached neither the manage page nor a confirm step within ` +
-        `${POST_SUBMIT_TIMEOUT_MS / 1000}s. Stopped at: ${page.url()}`,
+      `Kakao login neither returned to Tistory nor showed a confirm step ` +
+        `within ${POST_SUBMIT_TIMEOUT_MS / 1000}s. Stopped at: ${page.url()}`,
     );
   }
 
-  // 8. Confirm if asked, then wait out the redirect chain to the manage page
+  // 8. Confirm if asked, then wait out the redirect chain back to Tistory
   if (outcome === 'confirm') {
-    logger.log('Confirm step presented - clicking through');
+    await report('Kakao confirm step presented - clicking through');
     await page.click(confirmButton);
-    await page.waitForURL(managePattern, { timeout: MANAGE_TIMEOUT_MS });
+    try {
+      await page.waitForURL(isBackOnTistory, { timeout: REDIRECT_TIMEOUT_MS });
+    } catch {
+      throw new Error(
+        `Kakao confirm step was clicked, but Kakao did not hand back to ` +
+          `Tistory within ${REDIRECT_TIMEOUT_MS / 1000}s. Stopped at: ${page.url()}`,
+      );
+    }
+  }
+
+  // 9. Wherever Tistory ended the round trip, go to the manage page from there
+  // rather than wait for it to arrive on its own. A login that did not take
+  // shows up here as the manage page bouncing back to the login screen.
+  const landedAt = page.url();
+  if (isManagePage(new URL(landedAt), blogName)) {
+    await report('Kakao login returned straight to the manage page');
   } else {
-    logger.log('No confirm step - reached the manage page directly');
+    await report(
+      `Kakao login returned to ${landedAt} - going to the manage page from there`,
+    );
+    await page.goto(`https://${blogName}.tistory.com/manage`, {
+      waitUntil: 'domcontentloaded',
+    });
+    if (!isManagePage(new URL(page.url()), blogName)) {
+      throw new Error(
+        `Kakao login returned to Tistory, but the manage page still redirects ` +
+          `away, so the login did not take. Stopped at: ${page.url()}`,
+      );
+    }
   }
 
   logger.log('Login complete');
@@ -537,7 +595,7 @@ export async function runTistoryPublish(opts: {
       }
 
       await report('Login required. Starting Kakao auto-login.', 'warn');
-      await kakaoLogin(page, kakaoId, kakaoPassword, blogName);
+      await kakaoLogin(page, kakaoId, kakaoPassword, blogName, onProgress);
     } else {
       await report('Login status verified - saved session still valid');
     }
