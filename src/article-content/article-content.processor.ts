@@ -68,7 +68,7 @@ export class ArticleContentProcessor extends WorkerHost {
       await jobStep(
         job,
         20,
-        `calling claude-sonnet-4-6 (content, ${formatCharCount(length.min)}-` +
+        `calling claude-sonnet-5 (content, ${formatCharCount(length.min)}-` +
           `${formatCharCount(length.max)} chars) and claude-haiku-4-5 ` +
           `(hashtags) in parallel`,
       );

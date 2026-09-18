@@ -24,8 +24,10 @@ export class ArticleContentAiService {
     const prompt = buildContentPrompt(input);
 
     const response = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 10000,
+      model: 'claude-sonnet-5',
+      // Sonnet 5 tokenizes the same Korean into ~30% more tokens than Sonnet 4.6
+      // did, and its thinking is drawn from this same budget
+      max_tokens: 20000,
       messages: [
         {
           role: 'user',
