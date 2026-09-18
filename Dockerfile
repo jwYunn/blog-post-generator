@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# Alpine is safe here because sharp 0.34 publishes musl prebuilts
+# Alpine is safe here because sharp publishes musl prebuilts
 # (@img/sharp-linuxmusl-*), so no native build toolchain is needed.
 FROM node:22-alpine AS builder
 

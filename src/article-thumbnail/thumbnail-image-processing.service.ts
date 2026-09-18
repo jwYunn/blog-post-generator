@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import * as sharp from 'sharp';
+import sharp from 'sharp';
 
 interface TextZone {
   centerX: number;
