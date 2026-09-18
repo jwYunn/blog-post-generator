@@ -276,10 +276,10 @@ the pipeline chose while nobody was watching.
 ### Processor Steps
 1. Read the settings (`PIPELINE_*` env, see below)
 2. For each article the settings allow: take the highest-scoring **pending**
-   candidate at or above `PIPELINE_MIN_SCORE` and approve it — approval creates
-   the draft and enqueues `article-outline`, so the article writes itself from
-   there and the run does not wait for it
-3. Count what is left in the pool
+   candidate at or above `PIPELINE_MIN_SCORE` whose verdict is not `drop`, and
+   approve it — approval creates the draft and enqueues `article-outline`, so
+   the article writes itself from there and the run does not wait for it
+3. Count what is left in the pool, by the same test as step 2
 4. If the pool is below `POOL_LOW_WATER_MARK`, top it up: enqueue
    `topic-evaluate` for a seed holding unscored candidates, or `topic-generate`
    for the next seed in rotation when no such backlog is left
@@ -313,10 +313,17 @@ recent seeds still yields its best candidate. A filter would have stopped the
 pipeline the day it shipped, since every candidate then waiting came from a seed
 that already had an article.
 
+The evaluator's `drop` verdict is the one filter. The score does not carry it:
+uniqueness weighs 0.05 in the overall score, so a model that follows the weights
+exactly scores a duplicate of a written article 8.9 and marks it `drop`. Unlike
+a seed filter, it cannot stop the pipeline, because the pool count applies the
+same test (`whereDrawable` serves both queries): a pool of nothing but dropped
+candidates counts as empty and gets topped up.
+
 Fresh seeds reach the pool only by hand for now. The top-up is deliberately left
-counting every pending candidate: it can only regenerate from seeds that already
-exist, so firing it more often would add candidates to covered seeds rather than
-bring in new ones.
+counting every drawable candidate, covered seeds included: it can only
+regenerate from seeds that already exist, so firing it more often would add
+candidates to covered seeds rather than bring in new ones.
 
 ### Settings
 

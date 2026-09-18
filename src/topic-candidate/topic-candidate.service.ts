@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { TopicCandidateEntity } from './topic-candidate.entity';
@@ -14,6 +14,9 @@ import { ArticleDepth } from './enums/article-depth.enum';
 
 /** Days a seed rests after one of its candidates became an article */
 const SEED_COOLDOWN_DAYS = 7;
+
+/** The evaluator's "do not write this" - the scheduler skips it whatever the score */
+const DROP_VERDICT: TopicCandidateEntity['verdict'] = 'drop';
 import {
   QueryTopicCandidateListDto,
   CandidateSortBy,
@@ -362,13 +365,12 @@ export class TopicCandidateService {
         AND d."createdAt" > NOW() - (:cooldownDays * INTERVAL '1 day')
     )`;
 
-    return this.candidateRepository
-      .createQueryBuilder('tc')
-      .innerJoinAndSelect('tc.topicSeed', 'seed')
-      .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
-      .andWhere('tc.overallScore >= :minScore', { minScore })
-      .andWhere('seed.isActive = true')
-      .andWhere('seed.deletedAt IS NULL')
+    return this.whereDrawable(
+      this.candidateRepository
+        .createQueryBuilder('tc')
+        .innerJoinAndSelect('tc.topicSeed', 'seed'),
+      minScore,
+    )
       .setParameter('cooldownDays', cooldownDays)
       .setParameter('failedStatus', ArticleDraftStatus.FAILED)
       .orderBy(seedAlreadyCovered, 'ASC')
@@ -405,14 +407,40 @@ export class TopicCandidateService {
 
   /** How many candidates the scheduler could still draw on */
   async countPendingAtOrAbove(minScore: number): Promise<number> {
-    return this.candidateRepository
-      .createQueryBuilder('tc')
-      .innerJoin('tc.topicSeed', 'seed')
+    return this.whereDrawable(
+      this.candidateRepository
+        .createQueryBuilder('tc')
+        .innerJoin('tc.topicSeed', 'seed'),
+      minScore,
+    ).getCount();
+  }
+
+  /**
+   * What the scheduler may draw on: pending, scored at or above `minScore`, not
+   * marked drop, on a live seed.
+   *
+   * The pick and the pool count both take their conditions from here. Were
+   * they to disagree, the count would include candidates the pick refuses, the
+   * pool would look full and never be topped up, and nothing would be written.
+   *
+   * The verdict is checked on its own because the score does not carry it.
+   * Uniqueness weighs 0.05 in the overall score, so a model that follows the
+   * weights exactly scores a duplicate of a written article 8.9 and marks it
+   * drop. A null verdict passes - `!=` alone would exclude it, since
+   * NULL != 'drop' is not true in SQL.
+   */
+  private whereDrawable(
+    qb: SelectQueryBuilder<TopicCandidateEntity>,
+    minScore: number,
+  ): SelectQueryBuilder<TopicCandidateEntity> {
+    return qb
       .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
       .andWhere('tc.overallScore >= :minScore', { minScore })
+      .andWhere('(tc.verdict IS NULL OR tc.verdict != :dropVerdict)', {
+        dropVerdict: DROP_VERDICT,
+      })
       .andWhere('seed.isActive = true')
-      .andWhere('seed.deletedAt IS NULL')
-      .getCount();
+      .andWhere('seed.deletedAt IS NULL');
   }
 
   /**

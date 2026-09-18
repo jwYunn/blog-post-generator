@@ -363,4 +363,61 @@ describe('TopicCandidateService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  /**
+   * The scheduler draws from these two queries: one picks the article to write,
+   * the other decides whether the pool needs topping up. A candidate the pick
+   * refuses but the count includes makes the pool look full, so it is never
+   * refilled, and the scheduler writes nothing.
+   */
+  describe('what the scheduler may draw on', () => {
+    function stubQuery() {
+      const qb = {
+        innerJoin: jest.fn().mockReturnThis(),
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        setParameter: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getOne: jest.fn(async () => null),
+        getCount: jest.fn(async () => 0),
+      };
+      candidateRepository.createQueryBuilder = jest.fn(() => qb);
+      return qb;
+    }
+
+    // A model that follows the score weights exactly gives a duplicate of a
+    // written article 8.9 and verdict drop - the score alone lets it through
+    const excludesDrop = [
+      '(tc.verdict IS NULL OR tc.verdict != :dropVerdict)',
+      { dropVerdict: 'drop' },
+    ];
+
+    it('never picks a candidate the evaluator marked drop', async () => {
+      const qb = stubQuery();
+
+      await service.findBestPending(7);
+
+      expect(qb.andWhere).toHaveBeenCalledWith(...excludesDrop);
+    });
+
+    it('does not count a dropped candidate toward the pool', async () => {
+      const qb = stubQuery();
+
+      await service.countPendingAtOrAbove(7);
+
+      expect(qb.andWhere).toHaveBeenCalledWith(...excludesDrop);
+    });
+
+    it('puts the same conditions on the pick and the count', async () => {
+      const pick = stubQuery();
+      await service.findBestPending(7);
+      const count = stubQuery();
+      await service.countPendingAtOrAbove(7);
+
+      expect(count.where.mock.calls).toEqual(pick.where.mock.calls);
+      expect(count.andWhere.mock.calls).toEqual(pick.andWhere.mock.calls);
+    });
+  });
 });

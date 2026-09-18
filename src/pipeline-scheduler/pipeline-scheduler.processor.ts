@@ -94,7 +94,8 @@ export class PipelineSchedulerProcessor extends WorkerHost {
         // A run that publishes nothing still succeeds, so say what stopped it
         await jobLog(
           job,
-          `no pending candidate scores >= ${minScore} - nothing written today`,
+          `no pending candidate scores >= ${minScore} without a drop verdict - ` +
+            `nothing written today`,
         );
         break;
       }
@@ -128,7 +129,7 @@ export class PipelineSchedulerProcessor extends WorkerHost {
     await jobStep(
       job,
       80,
-      `pool holds ${remaining} candidate(s) at >= ${minScore}`,
+      `pool holds ${remaining} candidate(s) at >= ${minScore}, drop verdicts excluded`,
     );
 
     if (remaining >= POOL_LOW_WATER_MARK) return;
