@@ -31,13 +31,18 @@ Each item must include:
 - outline_preview: 1 or 2 bullet points for a brief topic, 3 for a standard one (short)
 
 ## Depth
-How much the searcher needs in order to be satisfied - not how advanced they
-are. A beginner question can need several sections; an advanced one can be
-answered in one.
-- brief: one expression with one core meaning or use. The whole answer fits in
-  one or two short sections - e.g. "수고하셨습니다 영어로", "otherwise 품사"
-- standard: several meanings to separate, or two expressions to compare -
-  e.g. "otherwise 뜻과 사용법", "adapt vs adopt 차이"
+Ask one question: does the searcher only need to pick an answer, or do they
+have to learn how to tell things apart? This is not how advanced they are - a
+beginner question can need a comparison, and an advanced one can be answered
+by a short list.
+- brief: the searcher wants an answer to use right away - the meaning of one
+  expression, or the few ways to say one Korean phrase in English with a line
+  on when each fits. An answer listing several expressions is still brief when
+  the reader only has to pick one - e.g. "수고하셨습니다 영어로",
+  "잘 부탁드립니다 영어로", "Please find attached 뜻", "otherwise 품사"
+- standard: the difference itself is the question, or the meaning shifts with
+  context and the reader has to learn to separate the uses - e.g.
+  "adapt vs adopt 차이", "make / do / have 차이", "otherwise 뜻과 사용법"
 - Do not mark a topic standard to make it look substantial. A short article
   that fully answers one question is the better post; padding it out to a
   longer length is what this field exists to stop

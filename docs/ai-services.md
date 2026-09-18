@@ -338,10 +338,17 @@ can need several sections, and an advanced one can be answered in one.
 
 | | brief | standard |
 |---|---|---|
-| Topic | one expression, one core point | several meanings, or two expressions compared |
-| Example | 수고하셨습니다 영어로, otherwise 품사 | otherwise 뜻과 사용법, adapt vs adopt 차이 |
+| Topic | an answer to use right away: one expression's meaning, or the few ways to say one Korean phrase | the difference itself is the question, or the meaning shifts with context |
+| Example | 수고하셨습니다 영어로, 확인 부탁드립니다 영어로, otherwise 품사 | adapt vs adopt 차이, say / tell / speak / talk 차이, otherwise 뜻과 사용법 |
 | Outline | 1–2 sections, at most 1 FAQ | exactly 3 sections, 1–2 FAQs |
 | Length | 800–1,200 chars (max 1,500) | 1,800–2,500 chars (max 3,000) |
+
+The test is whether the reader only has to pick an answer (brief) or has to
+learn to tell things apart (standard). A list of several expressions is still
+brief when the reader picks one. The first version of the rule called that a
+comparison, so the main topic of every "X 영어로" seed came out standard and
+brief articles came only from its side topics - which one-article-per-seed then
+all but ruled out, since the main topic scores highest.
 
 Decided once, when the candidate is generated, and carried forward:
 

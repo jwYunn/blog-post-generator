@@ -7,8 +7,14 @@
  * length.
  */
 export enum ArticleDepth {
-  /** One expression, one core point - "수고하셨습니다 영어로" */
+  /**
+   * An answer to use right away - one expression's meaning, or the few ways to
+   * say one Korean phrase: "확인 부탁드립니다 영어로"
+   */
   BRIEF = 'brief',
-  /** Several meanings, or two expressions compared - the shape every article had before depth existed */
+  /**
+   * The difference is the question, or the meaning shifts with context -
+   * "adapt vs adopt 차이". The shape every article had before depth existed
+   */
   STANDARD = 'standard',
 }
