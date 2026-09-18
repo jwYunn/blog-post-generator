@@ -106,8 +106,8 @@ cp .env.example .env
 Compose overrides `POSTGRES_HOST`, `POSTGRES_PORT`, `REDIS_HOST`, `REDIS_PORT`
 and `BROWSERLESS_URL` with in-network addresses, so one `.env` serves both a
 local checkout and the server. The host ports compose publishes are separate
-settings (`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`) — shifting one to dodge a
-local conflict must not follow the app into its container.
+settings (`POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`, `NGINX_HOST_PORT`) — shifting
+one to dodge a local conflict must not follow the app into its container.
 
 ### Queue Monitoring
 
@@ -202,9 +202,30 @@ Pushing to `main` builds an image, pushes it to GHCR, and deploys it to the VPS
 (`.github/workflows/deploy.yml`). The pipeline gates on lint, build and test
 first, so a broken commit never reaches the deploy job.
 
-The site sits behind a Cloudflare Tunnel with Access in front of it, which means
-the server publishes no inbound port for it. See the Infra doc in Notion for the
-full picture.
+The site has two ways in, and the server publishes no internet-facing port for
+either: a Cloudflare Tunnel with Access in front of it (`blog.dev-jaden.com`),
+and the tailnet, where `tailscale serve` on the host proxies to nginx's loopback
+port (`NGINX_HOST_PORT`, default 8080). See the Infra doc in Notion for the full
+picture.
+
+### Tailnet access
+
+`tailscale serve` is host configuration, not part of the stack, so the deploy
+never sets it up. On a fresh server, once the stack is running:
+
+```bash
+sudo tailscale up
+```
+
+```bash
+sudo tailscale serve --bg http://127.0.0.1:8080
+```
+
+The site is then at `https://<machine>.<tailnet>.ts.net`, and the setting
+survives reboots. The tailnet needs MagicDNS and HTTPS certificates enabled for
+that address to get a certificate. Use `serve`, never `funnel`: funnel publishes
+the same address to the whole internet, with neither Access nor the tailnet in
+front of it.
 
 ### Rolling back
 

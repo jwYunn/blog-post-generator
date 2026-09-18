@@ -133,9 +133,16 @@ services:
     image: nginx:alpine
     container_name: blog-generator-nginx
     logging: *default-logging
-    # Path routing only - TLS is Cloudflare's job and the tunnel leg is already
-    # encrypted. Deliberately publishes no host port: the tunnel is the only way
-    # in, so there is no origin address to bypass Cloudflare Access with.
+    # Path routing only - TLS ends before traffic gets here, at Cloudflare for
+    # the tunnel and at `tailscale serve` for the tailnet. Two ways in, neither
+    # with an internet-facing port:
+    #  - the Cloudflare Tunnel, which cloudflared reaches over this network
+    #  - the tailnet. `tailscale serve` runs on the host, outside Docker, so it
+    #    needs a host port to reach nginx through. Loopback only, like every
+    #    other port here: on 0.0.0.0 it would be an origin address that skips
+    #    both Cloudflare Access and the tailnet.
+    ports:
+      - '127.0.0.1:${NGINX_HOST_PORT:-8080}:80'
     volumes:
       - ./deploy/nginx/blog.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
