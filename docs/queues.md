@@ -305,7 +305,9 @@ In order of precedence:
    the next several articles on the same seed.
 2. **Then seeds with no article in the last seven days.** Candidates from one
    seed are scored in the same run and cluster around the same number, so score
-   alone would let a single seed supply several days running.
+   alone would let a single seed supply several days running. A failed draft
+   counts for neither this test nor the one above: it produced no article, so
+   it neither covers a seed nor rests it. Both tests share one definition.
 3. **Then highest score**, then the least recently used seed.
 
 Both preferences are orderings, not filters: a pool made entirely of covered or

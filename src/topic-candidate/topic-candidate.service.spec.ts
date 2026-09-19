@@ -380,6 +380,7 @@ describe('TopicCandidateService', () => {
         setParameter: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
         addOrderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
         getOne: jest.fn(async () => null),
         getCount: jest.fn(async () => 0),
       };
@@ -418,6 +419,29 @@ describe('TopicCandidateService', () => {
 
       expect(count.where.mock.calls).toEqual(pick.where.mock.calls);
       expect(count.andWhere.mock.calls).toEqual(pick.andWhere.mock.calls);
+    });
+
+    // getOne() adds no LIMIT of its own - without one it reads the whole pool
+    it('fetches one row, not the whole pool', async () => {
+      const qb = stubQuery();
+
+      await service.findBestPending(7);
+
+      expect(qb.limit).toHaveBeenCalledWith(1);
+    });
+
+    // A failed draft produced no article: it must neither mark the seed as
+    // covered nor rest it for the cooldown
+    it('leaves failed drafts out of both seed tests', async () => {
+      const qb = stubQuery();
+
+      await service.findBestPending(7);
+
+      const [covered] = qb.orderBy.mock.calls[0];
+      const [recent] = qb.addOrderBy.mock.calls[0];
+      expect(covered).toContain('d.status != :failedStatus');
+      expect(recent).toContain('d.status != :failedStatus');
+      expect(recent).toContain(':cooldownDays');
     });
   });
 });

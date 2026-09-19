@@ -346,38 +346,43 @@ export class TopicCandidateService {
     minScore: number,
     cooldownDays = SEED_COOLDOWN_DAYS,
   ): Promise<TopicCandidateEntity | null> {
-    // "Covered" means what it means in findCoveredTitlesBySeed: any draft that
-    // did not fail. Counting only published articles would miss the ones still
-    // waiting for review, and those pile up while publishing stays manual.
-    const seedAlreadyCovered = `EXISTS (
+    // Both tests count the same drafts: any that did not fail, which is also
+    // what findCoveredTitlesBySeed calls covered. A failed draft produced no
+    // article, so it neither covers a seed nor rests it. Counting only
+    // published articles would miss the ones still waiting for review, and
+    // those pile up while publishing stays manual.
+    const liveDraftOnSeed = (extra = '') => `EXISTS (
       SELECT 1
       FROM article_drafts d
       JOIN topic_candidates sibling ON sibling.id = d."topicCandidateId"
       WHERE sibling."topicSeedId" = seed.id
         AND d.status != :failedStatus
+        ${extra}
     )`;
+    const seedAlreadyCovered = liveDraftOnSeed();
+    const seedUsedRecently = liveDraftOnSeed(
+      `AND d."createdAt" > NOW() - (:cooldownDays * INTERVAL '1 day')`,
+    );
 
-    const seedUsedRecently = `EXISTS (
-      SELECT 1
-      FROM article_drafts d
-      JOIN topic_candidates sibling ON sibling.id = d."topicCandidateId"
-      WHERE sibling."topicSeedId" = seed.id
-        AND d."createdAt" > NOW() - (:cooldownDays * INTERVAL '1 day')
-    )`;
-
-    return this.whereDrawable(
-      this.candidateRepository
-        .createQueryBuilder('tc')
-        .innerJoinAndSelect('tc.topicSeed', 'seed'),
-      minScore,
-    )
-      .setParameter('cooldownDays', cooldownDays)
-      .setParameter('failedStatus', ArticleDraftStatus.FAILED)
-      .orderBy(seedAlreadyCovered, 'ASC')
-      .addOrderBy(seedUsedRecently, 'ASC')
-      .addOrderBy('tc.overallScore', 'DESC')
-      .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
-      .getOne();
+    return (
+      this.whereDrawable(
+        this.candidateRepository
+          .createQueryBuilder('tc')
+          .innerJoinAndSelect('tc.topicSeed', 'seed'),
+        minScore,
+      )
+        .setParameter('cooldownDays', cooldownDays)
+        .setParameter('failedStatus', ArticleDraftStatus.FAILED)
+        .orderBy(seedAlreadyCovered, 'ASC')
+        .addOrderBy(seedUsedRecently, 'ASC')
+        .addOrderBy('tc.overallScore', 'DESC')
+        .addOrderBy('seed.lastUsedAt', 'ASC', 'NULLS FIRST')
+        // Without it getOne() fetches every drawable candidate and keeps the
+        // first. limit rather than take: the join is many-to-one, so one row is
+        // one candidate, and take would split this into two queries
+        .limit(1)
+        .getOne()
+    );
   }
 
   /**
@@ -428,6 +433,10 @@ export class TopicCandidateService {
    * weights exactly scores a duplicate of a written article 8.9 and marks it
    * drop. A null verdict passes - `!=` alone would exclude it, since
    * NULL != 'drop' is not true in SQL.
+   *
+   * A deleted seed needs no condition here: TopicSeedEntity has a
+   * @DeleteDateColumn, so TypeORM adds seed.deletedAt IS NULL to any join
+   * through the relation. Joining the table by name would lose that.
    */
   private whereDrawable(
     qb: SelectQueryBuilder<TopicCandidateEntity>,
@@ -439,8 +448,7 @@ export class TopicCandidateService {
       .andWhere('(tc.verdict IS NULL OR tc.verdict != :dropVerdict)', {
         dropVerdict: DROP_VERDICT,
       })
-      .andWhere('seed.isActive = true')
-      .andWhere('seed.deletedAt IS NULL');
+      .andWhere('seed.isActive = true');
   }
 
   /**
@@ -455,8 +463,8 @@ export class TopicCandidateService {
       .innerJoin('tc.topicSeed', 'seed')
       .where('tc.status = :status', { status: TopicCandidateStatus.PENDING })
       .andWhere('tc.overallScore IS NULL')
+      // The join through the relation already leaves deleted seeds out
       .andWhere('seed.isActive = true')
-      .andWhere('seed.deletedAt IS NULL')
       .groupBy('tc.topicSeedId')
       .orderBy('COUNT(tc.id)', 'DESC')
       .limit(1)
