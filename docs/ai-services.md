@@ -4,7 +4,7 @@
 
 | Module | Service | Provider | Model | Max Tokens | Task |
 |--------|---------|----------|-------|------------|------|
-| topic-generate | `TopicGenerateAiService` | Anthropic | `claude-opus-4-5` | 4096 | Generate 10 topic candidates |
+| topic-generate | `TopicGenerateAiService` | Anthropic | `claude-sonnet-5` | 12000 | Generate 10 topic candidates |
 | topic-evaluate | `TopicEvaluateAiService` | OpenAI | `gpt-5.6-luna` | 16384 | Score & rank candidates |
 | article-outline | `ArticleOutlineAiService` | OpenAI | `gpt-5` | — | Generate SEO article outline |
 | article-content | `ArticleContentAiService` | Anthropic | `claude-sonnet-5` | 20000 | Write full markdown article |
@@ -31,7 +31,7 @@ there to check a result against what was asked.
 ## TopicGenerateAiService
 
 **File**: `src/topic-generate/topic-generate-ai.service.ts`
-**Model**: `claude-opus-4-5` (Anthropic)
+**Model**: `claude-sonnet-5` (Anthropic), max tokens: 12000
 
 ### Method: `generateCandidates(seedText: string)`
 

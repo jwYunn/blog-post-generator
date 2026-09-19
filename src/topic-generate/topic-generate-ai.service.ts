@@ -42,17 +42,23 @@ export class TopicGenerateAiService {
     this.logger.log(`Calling Claude for seed: "${seedText}"`);
 
     const message = await this.anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 4096,
+      model: 'claude-sonnet-5',
+      // Thinking is drawn from this budget too, and Sonnet 5's tokenizer makes
+      // the same candidate list ~30% longer - 4096 no longer clears a full list
+      max_tokens: 12000,
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const text =
-      message.content[0].type === 'text' ? message.content[0].text : '';
+    // Sonnet 5 thinks by default, so the first block is a thinking block, not
+    // the JSON - read every text block rather than whichever comes first
+    const text = message.content
+      .filter((c) => c.type === 'text')
+      .map((c: any) => c.text)
+      .join('');
 
     const items = parseJsonArrayResponse<AiCandidateItem>(
       text,
-      'claude-opus-4-5 topic generation',
+      'claude-sonnet-5 topic generation',
       this.logger,
     );
 

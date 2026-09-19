@@ -52,7 +52,7 @@ export class TopicGenerateProcessor extends WorkerHost {
         `seed ${seedId} "${seed.seed}" (category: ${seed.category})`,
       );
 
-      await jobStep(job, 20, 'calling claude-opus-4-5 for candidates');
+      await jobStep(job, 20, 'calling claude-sonnet-5 for candidates');
       const { candidates, droppedNonKorean } =
         await this.topicGenerateAiService.generateCandidates(seed.seed);
       await jobStep(
